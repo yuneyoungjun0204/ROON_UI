@@ -50,9 +50,11 @@ export function stepUsv(s: UsvState, dt: number): void {
   const targetSpeed = MAX_SPEED_MS * (s.throttle / 100);
   s.speed += ((targetSpeed - s.speed) / ACCEL_TAU) * dt;
 
-  // 선회율: 타각과 속력에 비례 (풀타·풀스피드에서 약 2.6 deg/s)
+  // 선회율: 타각과 속력에 비례. 저속에서도 돌 수 있게 하한을 둔다.
+  // (풀타·풀스피드에서 약 8.4 deg/s, 저속에서도 약 3.4 deg/s)
   const speedFactor = clamp(Math.abs(s.speed) / MAX_SPEED_MS, 0, 1);
-  const turnRate = s.rudder * 0.12 * speedFactor * Math.sign(s.speed || 1);
+  const turnGain = 0.4 + 0.6 * speedFactor; // 저속 하한 0.4
+  const turnRate = s.rudder * 0.24 * turnGain * Math.sign(s.speed || 1);
   s.heading = (s.heading + turnRate * dt + 360) % 360;
 
   // 위치 적분 (위경도 + 씬 ENU 동시)
