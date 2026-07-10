@@ -65,8 +65,9 @@ export function Usv() {
 
     // 파도 자세 + 속도 트림(선수 들림) + 선회 횡경사(뱅킹)
     // 쌍동선은 폭이 넓어 롤이 적게 나므로 계수를 낮춘다.
+    // 선체가 길어 파도 피치가 크게 나오므로 감쇠해 끝단이 물에 박히지 않게 한다.
     const speedRatio = Math.min(Math.abs(usv.speed) / MAX_SPEED_MS, 1);
-    const targetPitch = Math.atan2(hBow - hStern, LENGTH) + speedRatio * 0.05;
+    const targetPitch = Math.atan2(hBow - hStern, LENGTH) * 0.6 + speedRatio * 0.05;
     const targetRoll =
       Math.atan2(hStb - hPort, BEAM) * 0.6 - ((usv.rudder * Math.PI) / 180) * 0.08 * speedRatio;
 
@@ -77,7 +78,7 @@ export function Usv() {
     s.pitch += (targetPitch - s.pitch) * k;
     s.roll += (targetRoll - s.roll) * k;
 
-    g.position.set(usv.x, s.y - 0.4, usv.z); // 흘수만큼 가라앉힘
+    g.position.set(usv.x, s.y - 0.1, usv.z); // 흘수 0.1m만 잠기고 건현을 최대한 확보
     g.rotation.set(0, 0, 0);
     g.rotation.order = "YXZ";
     g.rotation.y = yaw;
