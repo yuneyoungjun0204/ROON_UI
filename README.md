@@ -24,6 +24,21 @@ npm run dev
 
 브로커 없이도 실행됩니다(HUD에 "연결 끊김" 표시). 로컬 연동을 하려면 iot-monitoring-control의 Mosquitto에 WebSocket 리스너(9001)가 켜져 있어야 합니다.
 
+### 환경변수
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `VITE_MQTT_PROTOCOL` | `ws` | `ws` 또는 `wss` |
+| `VITE_MQTT_HOST` | `localhost` | 브로커 호스트 |
+| `VITE_MQTT_PORT` | ws=`9001`, wss=`8884` | WebSocket 포트 |
+| `VITE_MQTT_PATH` | `/` | WebSocket 경로 (HiveMQ 등은 `/mqtt`) |
+| `VITE_MQTT_URL` | — | 전체 URL 직접 지정 (설정 시 위 조각들보다 우선) |
+| `VITE_MQTT_USERNAME` / `VITE_MQTT_PASSWORD` | — | 브로커 계정 (로컬 브로커는 `device` 계정) |
+| `VITE_DEVICE_TOKEN` | `sim-usv-1` | 텔레메트리 발행 토픽의 기기 토큰 |
+| `VITE_DEVICE_ID` | `1` | 명령 구독 토픽의 기기 ID |
+| `VITE_TELEMETRY_INTERVAL_MS` | `2000` | 텔레메트리 발행 주기 |
+| `VITE_INITIAL_LAT` / `VITE_INITIAL_LON` | `35.05` / `129.08` | 시작 위치 |
+
 ## 조작
 
 | 입력 | 동작 |

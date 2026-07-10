@@ -7,6 +7,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { Ocean } from "./Ocean";
 import { Usv } from "./Usv";
+import { Wake } from "./Wake";
 import { useSimStore } from "../store";
 import { waveHeight } from "../sim/waves";
 
@@ -67,6 +68,7 @@ export function Scene() {
       />
       <directionalLight position={[-40, 25, 60]} intensity={0.5} />
       <Ocean sunDir={SUN_DIR} />
+      <Wake />
       <Usv />
       <FollowCamera />
     </Canvas>

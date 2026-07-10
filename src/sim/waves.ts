@@ -18,8 +18,10 @@ const norm = (x: number, z: number): [number, number] => {
 const d1 = norm(1, 0.6);
 const d2 = norm(-0.4, 1);
 const d3 = norm(0.8, -0.5);
+const d4 = norm(0.25, 1);
 
 export const WAVES: Wave[] = [
+  { amplitude: 0.5, wavelength: 140, speed: 0.7, dirX: d4[0], dirZ: d4[1] },
   { amplitude: 0.55, wavelength: 60, speed: 1.1, dirX: d1[0], dirZ: d1[1] },
   { amplitude: 0.3, wavelength: 27, speed: 1.6, dirX: d2[0], dirZ: d2[1] },
   { amplitude: 0.16, wavelength: 11, speed: 2.4, dirX: d3[0], dirZ: d3[1] },

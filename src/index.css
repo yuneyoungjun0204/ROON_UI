@@ -89,7 +89,7 @@ body {
 }
 
 .top-right {
-  top: 16px;
+  bottom: 20px;
   right: 16px;
   display: flex;
   flex-direction: column;
@@ -136,6 +136,10 @@ body {
   font-size: 11px;
   font-family: "SF Mono", ui-monospace, monospace;
   color: #8fa3b3;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .last-cmd {
@@ -197,4 +201,44 @@ input[type="range"] {
 .hint {
   font-size: 10.5px;
   color: #7b8fa0;
+}
+
+.minimap {
+  top: 16px;
+  right: 16px;
+  padding: 10px;
+}
+
+.minimap-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.minimap-zoom {
+  display: flex;
+  gap: 4px;
+}
+
+.minimap-zoom button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #b8ccdb;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.minimap-zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.minimap-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

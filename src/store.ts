@@ -39,13 +39,31 @@ export const useSimStore = create<SimStore>((set) => ({
 
 const TICK_MS = 50;
 
-/** 시뮬레이션 루프 시작. App 마운트 시 한 번 호출. 정리 함수를 반환. */
+/** 미니맵용 항적 — 씬 ENU 좌표 [x, z] 쌍의 평면 배열. 리렌더 없이 캔버스가 직접 읽는다. */
+export const trail: number[] = [];
+const TRAIL_MIN_DIST = 2.5; // m — 이 이상 움직였을 때만 점 추가
+const TRAIL_MAX_POINTS = 3000;
+
+/** 시뮬레이션 루프 시작. App 마운트 시 한 번 호출. 정리 함수를 반환.
+ * dt는 실제 경과 시간으로 계산한다 — 타이머가 밀려도 시뮬레이션 시간이 느려지지 않게. */
 export function startSimLoop(): () => void {
+  let last = performance.now();
   const id = setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min((now - last) / 1000, 0.5); // 탭 복귀 등 큰 공백은 잘라냄
+    last = now;
     const { usv } = useSimStore.getState();
     const next = { ...usv };
-    stepUsv(next, TICK_MS / 1000);
+    stepUsv(next, dt);
     useSimStore.setState({ usv: next });
+
+    const n = trail.length;
+    const moved =
+      n === 0 || Math.hypot(next.x - trail[n - 2], next.z - trail[n - 1]) >= TRAIL_MIN_DIST;
+    if (moved) {
+      trail.push(next.x, next.z);
+      if (trail.length > TRAIL_MAX_POINTS * 2) trail.splice(0, 2);
+    }
   }, TICK_MS);
   return () => clearInterval(id);
 }

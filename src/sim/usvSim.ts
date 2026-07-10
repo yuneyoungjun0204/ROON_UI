@@ -1,10 +1,10 @@
 // USV(무인수상정) 운동학 시뮬레이션 — 타각/스로틀 입력을 받아 침로·속도·위경도를 적분한다.
 
-export const MAX_SPEED_KN = 16; // 최대 속력 (knots)
+export const MAX_SPEED_KN = 30; // 최대 속력 (knots) — 고속 USV급
 export const MAX_RUDDER_DEG = 35;
 const KN_TO_MS = 0.514444;
-const MAX_SPEED_MS = MAX_SPEED_KN * KN_TO_MS;
-const ACCEL_TAU = 9; // 가감속 시간 상수 (s)
+export const MAX_SPEED_MS = MAX_SPEED_KN * KN_TO_MS;
+const ACCEL_TAU = 6; // 가감속 시간 상수 (s)
 const RUDDER_SLEW = 12; // 타각 변화 속도 (deg/s)
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -52,7 +52,7 @@ export function stepUsv(s: UsvState, dt: number): void {
 
   // 선회율: 타각과 속력에 비례 (풀타·풀스피드에서 약 2.6 deg/s)
   const speedFactor = clamp(Math.abs(s.speed) / MAX_SPEED_MS, 0, 1);
-  const turnRate = s.rudder * 0.075 * speedFactor * Math.sign(s.speed || 1);
+  const turnRate = s.rudder * 0.12 * speedFactor * Math.sign(s.speed || 1);
   s.heading = (s.heading + turnRate * dt + 360) % 360;
 
   // 위치 적분 (위경도 + 씬 ENU 동시)

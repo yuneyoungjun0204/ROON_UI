@@ -6,6 +6,7 @@ import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare } from "lucid
 import { useSimStore } from "../store";
 import { MAX_RUDDER_DEG } from "../sim/usvSim";
 import { config } from "../config";
+import { Minimap } from "./Minimap";
 
 const MS_TO_KN = 1.943844;
 
@@ -120,6 +121,8 @@ export function Hud() {
           <div className="hint">←/→ 타각 · ↑/↓ 스로틀</div>
         </div>
       </div>
+
+      <Minimap />
     </div>
   );
 }
