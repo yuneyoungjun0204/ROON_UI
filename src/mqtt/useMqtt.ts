@@ -12,7 +12,7 @@ const MS_TO_KN = 1.943844;
 
 export function useMqtt(): void {
   useEffect(() => {
-    const { setMqttStatus, setRudderCmd, setThrottle, setLastCommand } =
+    const { setMqttStatus, setSteer, setThrottle, setLastCommand } =
       useSimStore.getState();
 
     setMqttStatus("connecting");
@@ -43,8 +43,12 @@ export function useMqtt(): void {
         };
         const value = Number(cmd.value);
         if (!Number.isFinite(value)) return;
-        if (cmd.channel === "rudder") {
-          setRudderCmd(value);
+        if (cmd.channel === "steer") {
+          setSteer(value);
+          setLastCommand(`steer → ${value}%`);
+        } else if (cmd.channel === "rudder") {
+          // 구버전 호환: 타각(deg, ±35) → 조향(%, ±100)으로 환산
+          setSteer((value / 35) * 100);
           setLastCommand(`rudder → ${value}°`);
         } else if (cmd.channel === "throttle") {
           setThrottle(value);
@@ -64,7 +68,8 @@ export function useMqtt(): void {
         lon: usv.lon,
         heading: usv.heading,
         sog: usv.speed * MS_TO_KN,
-        rudder: usv.rudder,
+        thrust_port: usv.thrustPort,
+        thrust_stbd: usv.thrustStbd,
       };
       const ts = Math.floor(Date.now() / 1000);
       for (const [sensor, value] of Object.entries(readings)) {

@@ -259,8 +259,9 @@ export function Usv() {
     // 파도 자세 + 속도 트림(선수 들림) + 선회 횡경사(뱅킹)
     const speedRatio = Math.min(Math.abs(usv.speed) / MAX_SPEED_MS, 1);
     const targetPitch = Math.atan2(hBow - hStern, LENGTH) * 0.6 + speedRatio * 0.045;
+    // 선회 횡경사(뱅킹): 요 레이트에 비례 — 차동 추진이라 타각 대신 회두율로 계산
     const targetRoll =
-      Math.atan2(hStb - hPort, BEAM) * 0.6 - ((usv.rudder * Math.PI) / 180) * 0.1 * speedRatio;
+      Math.atan2(hStb - hPort, BEAM) * 0.6 - ((usv.yawRate * Math.PI) / 180) * 0.28 * speedRatio;
 
     // 부드럽게 수렴 (관성 흉내)
     const k = Math.min(1, dt * 2.5);

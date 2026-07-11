@@ -15,7 +15,6 @@ import {
   Gamepad2,
 } from "lucide-react";
 import { useSimStore } from "../store";
-import { MAX_RUDDER_DEG } from "../sim/usvSim";
 import { config, STATION_ZONE_RADIUS_M } from "../config";
 import { controls, resetControls } from "../sim/controls";
 import { Minimap } from "./SatelliteMinimap";
@@ -35,10 +34,33 @@ function StatusBadge() {
   );
 }
 
+/** 좌/우 쓰러스터 출력 게이지 — 중앙 기준으로 정방향(초록)/역방향(빨강) 채움 */
+function ThrusterBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(100, Math.abs(value)); // 0~100
+  const forward = value >= 0;
+  return (
+    <div className="thruster-row">
+      <span className="thruster-label">{label}</span>
+      <div className="thruster-bar">
+        <div className="thruster-center" />
+        <div
+          className={`thruster-fill ${forward ? "fwd" : "rev"}`}
+          style={
+            forward
+              ? { left: "50%", width: `${pct / 2}%` }
+              : { right: "50%", width: `${pct / 2}%` }
+          }
+        />
+      </div>
+      <span className="thruster-value">{value.toFixed(0)}%</span>
+    </div>
+  );
+}
+
 export function Hud() {
   const usv = useSimStore((s) => s.usv);
   const lastCommand = useSimStore((s) => s.lastCommand);
-  const setRudderCmd = useSimStore((s) => s.setRudderCmd);
+  const setSteer = useSimStore((s) => s.setSteer);
   const setThrottle = useSimStore((s) => s.setThrottle);
   const returnToStation = useSimStore((s) => s.returnToStation);
   const autopilot = useSimStore((s) => s.autopilot);
@@ -164,31 +186,31 @@ export function Hud() {
         </button>
         <div className="control">
           <div className="control-head">
-            <span className="label">RUDDER</span>
+            <span className="label">STEER</span>
             <span className="value">
-              {usv.rudder < -0.05 ? (
+              {usv.steer < -0.5 ? (
                 <span className="dir dir-port">PORT</span>
-              ) : usv.rudder > 0.05 ? (
+              ) : usv.steer > 0.5 ? (
                 <span className="dir dir-stbd">STBD</span>
               ) : null}
-              {Math.abs(usv.rudder).toFixed(0)}°
+              {Math.abs(usv.steer).toFixed(0)}%
             </span>
           </div>
           <div className="slider-wrap">
-            {/* 타 중앙(0°) 눈금 */}
+            {/* 조향 중앙(0) 눈금 */}
             <div className="tick" style={{ left: "50%" }} />
             <input
               type="range"
-              min={-MAX_RUDDER_DEG}
-              max={MAX_RUDDER_DEG}
+              min={-100}
+              max={100}
               step={1}
-              value={usv.rudderCmd}
-              onChange={(e) => setRudderCmd(Number(e.target.value))}
+              value={usv.steer}
+              onChange={(e) => setSteer(Number(e.target.value))}
             />
           </div>
           <div className="control-foot">
-            <button className="center-btn" onClick={() => setRudderCmd(0)}>
-              타 중앙
+            <button className="center-btn" onClick={() => setSteer(0)}>
+              조향 중앙
             </button>
             <span className="hint">←/→ 또는 A/D</span>
           </div>
@@ -199,11 +221,11 @@ export function Hud() {
             <span className="value">{usv.throttle.toFixed(0)}%</span>
           </div>
           <div className="slider-wrap">
-            {/* 스로틀 0% 눈금 (범위 -25~100 → 20% 지점) */}
-            <div className="tick" style={{ left: "20%" }} />
+            {/* 스로틀 0% 눈금 (범위 -100~100 → 중앙) */}
+            <div className="tick" style={{ left: "50%" }} />
             <input
               type="range"
-              min={-25}
+              min={-100}
               max={100}
               step={5}
               value={usv.throttle}
@@ -216,6 +238,14 @@ export function Hud() {
             </button>
             <span className="hint">↑/↓ 또는 W/S · 떼면 유지</span>
           </div>
+        </div>
+        <div className="control thrusters">
+          <div className="control-head">
+            <span className="label">THRUSTERS</span>
+          </div>
+          <ThrusterBar label="L" value={usv.thrustPort} />
+          <ThrusterBar label="R" value={usv.thrustStbd} />
+          <span className="hint">좌/우 차동 추진 · 후미 장착</span>
         </div>
       </div>
 

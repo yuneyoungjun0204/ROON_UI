@@ -7,7 +7,7 @@ import { config, STATION_ZONE_RADIUS_M } from "./config";
 import {
   createUsvState,
   stepUsv,
-  clampRudder,
+  clampSteer,
   clampThrottle,
   type UsvState,
 } from "./sim/usvSim";
@@ -37,7 +37,7 @@ interface SimStore {
   returningToStation: boolean;
   /** 통과한 웨이포인트 수 — waypoints[0..reachedCount)는 도달 완료 */
   reachedCount: number;
-  setRudderCmd: (deg: number) => void;
+  setSteer: (pct: number) => void;
   setThrottle: (pct: number) => void;
   setMqttStatus: (s: MqttStatus) => void;
   setWaterPolygons: (polygons: WaterPolygon[]) => void;
@@ -120,8 +120,8 @@ export const useSimStore = create<SimStore>((set) => ({
   autopilot: false,
   returningToStation: false,
   reachedCount: 0,
-  setRudderCmd: (deg) =>
-    set((st) => ({ usv: { ...st.usv, rudderCmd: clampRudder(deg) } })),
+  setSteer: (pct) =>
+    set((st) => ({ usv: { ...st.usv, steer: clampSteer(pct) } })),
   setThrottle: (pct) =>
     set((st) => ({ usv: { ...st.usv, throttle: clampThrottle(pct) } })),
   setMqttStatus: (mqttStatus) => set({ mqttStatus }),
@@ -282,8 +282,8 @@ export function startSimLoop(): () => void {
     last = now;
     const { usv, waterPolygons, autopilot, route, waypoints, reachedCount } =
       useSimStore.getState();
-    // 눌린 키를 dt 기반으로 반영 (연속 조타/스로틀 + 타 자동 중앙 복원)
-    let { rudderCmd, throttle } = applyKeyboardControls(usv, dt);
+    // 눌린 키를 dt 기반으로 반영 (연속 조향/스로틀 + 조향 자동 중앙 복원)
+    let { steer, throttle } = applyKeyboardControls(usv, dt);
 
     // 자동 항해 — 계획 경로를 추종. 수동 키 입력이 들어오면 즉시 해제.
     const navUpdates: Partial<
@@ -299,9 +299,9 @@ export function startSimLoop(): () => void {
         stoppingAfterArrival = false;
       } else if (stoppingAfterArrival) {
         // 도착 후 정지 단계 — 타력에 밀려 존 밖으로 나가지 않게 역추진으로 멈춘다.
-        rudderCmd = 0;
+        steer = 0;
         if (usv.speed > STOP_SPEED_MS) {
-          throttle = -25;
+          throttle = -40;
           brakingThisTick = true;
         } else {
           // 완전 정지 — 이제 수동 조작으로 전환
@@ -314,7 +314,7 @@ export function startSimLoop(): () => void {
         }
       } else {
         const out = followRoute(usv, route.points, followState);
-        rudderCmd = out.rudderCmd;
+        steer = out.steer;
         throttle = out.throttle;
         // 통과한 웨이포인트 수 갱신 (route는 미도달 웨이포인트만 담고 있다)
         const base = waypoints.length - route.wpIndex.length;
@@ -325,9 +325,9 @@ export function startSimLoop(): () => void {
         if (out.arrived) {
           // 즉시 해제하지 않고 정지 단계로 진입 — 속도 0까지 자동 제어 유지
           stoppingAfterArrival = true;
-          rudderCmd = 0;
+          steer = 0;
           if (usv.speed > STOP_SPEED_MS) {
-            throttle = -25;
+            throttle = -40;
             brakingThisTick = true;
           }
         } else if (base + passed > reachedCount) {
@@ -349,7 +349,7 @@ export function startSimLoop(): () => void {
       }
     }
 
-    const next = { ...usv, rudderCmd, throttle };
+    const next = { ...usv, steer, throttle };
     stepUsv(next, dt);
     // 정지 단계의 역추진이 후진으로 이어지지 않게 — 멈추는 게 목적이다
     if (brakingThisTick && next.speed < 0) next.speed = 0;

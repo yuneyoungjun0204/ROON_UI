@@ -360,6 +360,70 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.02em;
 }
 
+/* ---------- 좌/우 쓰러스터 게이지 ---------- */
+
+.control.thrusters {
+  width: 150px;
+  gap: 7px;
+}
+
+.thruster-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.thruster-label {
+  width: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f93a4;
+}
+
+.thruster-bar {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.thruster-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.thruster-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition: width 0.08s linear;
+}
+
+.thruster-fill.fwd {
+  background: linear-gradient(90deg, rgba(76, 217, 100, 0.55), rgba(76, 217, 100, 0.95));
+  border-radius: 0 5px 5px 0;
+}
+
+.thruster-fill.rev {
+  background: linear-gradient(270deg, rgba(255, 122, 112, 0.55), rgba(255, 122, 112, 0.95));
+  border-radius: 5px 0 0 5px;
+}
+
+.thruster-value {
+  width: 38px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: #cfdde8;
+}
+
 /* ---------- 운항 모드 상태 ---------- */
 
 .mode-status {
