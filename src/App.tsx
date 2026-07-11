@@ -11,6 +11,7 @@ export default function App() {
   return (
     <div className="app">
       <Scene />
+      <div className="vignette" />
       <Hud />
     </div>
   );

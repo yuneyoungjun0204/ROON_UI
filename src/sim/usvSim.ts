@@ -1,11 +1,14 @@
 // USV(무인수상정) 운동학 시뮬레이션 — 타각/스로틀 입력을 받아 침로·속도·위경도를 적분한다.
 
-export const MAX_SPEED_KN = 30; // 최대 속력 (knots) — 고속 USV급
+export const MAX_SPEED_KN = 40; // 최대 속력 (knots) — 임시 상향 (답답함 해소용, 현실값은 ~20)
 export const MAX_RUDDER_DEG = 35;
 const KN_TO_MS = 0.514444;
 export const MAX_SPEED_MS = MAX_SPEED_KN * KN_TO_MS;
-const ACCEL_TAU = 6; // 가감속 시간 상수 (s)
-const RUDDER_SLEW = 12; // 타각 변화 속도 (deg/s)
+// 3-tau 동역학 (shipmulator 이식): 상황별 시간 상수 분리로 "배다운" 관성을 만든다.
+const ACCEL_TAU = 4.0; // 가속 (s)
+const COAST_TAU = 7.0; // 타력 — 스로틀을 내리면 천천히 미끄러지며 감속
+const BRAKE_TAU = 3.0; // 제동 — 역추진(반대 방향 지령) 시 또렷하게
+const RUDDER_SLEW = 40; // 타각 변화 속도 (deg/s) — 풀타까지 약 0.9s
 const METERS_PER_DEG_LAT = 111_320;
 
 export interface UsvState {
@@ -46,16 +49,29 @@ export function stepUsv(s: UsvState, dt: number): void {
   const rudderDelta = clamp(s.rudderCmd - s.rudder, -RUDDER_SLEW * dt, RUDDER_SLEW * dt);
   s.rudder += rudderDelta;
 
-  // 스로틀 → 목표 속력으로 1차 지연 수렴
+  // 스로틀 → 목표 속력. 상황(가속/타력/제동)에 맞는 시간 상수로 1차 지연 수렴.
   const targetSpeed = MAX_SPEED_MS * (s.throttle / 100);
-  s.speed += ((targetSpeed - s.speed) / ACCEL_TAU) * dt;
+  let tau: number;
+  if (Math.abs(targetSpeed) > Math.abs(s.speed) && targetSpeed * s.speed >= 0) {
+    tau = ACCEL_TAU; // 같은 방향으로 더 빠르게
+  } else if (targetSpeed * s.speed < -0.01) {
+    tau = BRAKE_TAU; // 역추진 제동
+  } else {
+    tau = COAST_TAU; // 타력으로 미끄러지며 감속
+  }
+  s.speed += ((targetSpeed - s.speed) / tau) * dt;
+  if (Math.abs(s.speed) < 0.005 && s.throttle === 0) s.speed = 0;
 
-  // 선회율: 타각과 속력에 비례. 저속에서도 돌 수 있게 하한을 둔다.
-  // (풀타·풀스피드에서 약 8.4 deg/s, 저속에서도 약 3.4 deg/s)
-  const speedFactor = clamp(Math.abs(s.speed) / MAX_SPEED_MS, 0, 1);
-  const turnGain = 0.4 + 0.6 * speedFactor; // 저속 하한 0.4
-  const turnRate = s.rudder * 0.24 * turnGain * Math.sign(s.speed || 1);
+  // 선회율: 타각 × 속도 곡선 v/(v+3.5) — 저속에선 둔하고 속도가 붙을수록 기민해진다.
+  // (풀타 기준: 2kn ≈ 4.4°/s, 10kn ≈ 11.4°/s, 20kn ≈ 14.4°/s)
+  const av = Math.abs(s.speed);
+  const turnRate = s.rudder * 0.55 * (av / (av + 3.5)) * Math.sign(s.speed || 1);
   s.heading = (s.heading + turnRate * dt + 360) % 360;
+
+  // 급선회 시 속력 손실 — 코너에서 자연스럽게 감속하는 느낌
+  const speedFactor = clamp(av / MAX_SPEED_MS, 0, 1);
+  const turnLoss = (Math.abs(s.rudder) / MAX_RUDDER_DEG) * speedFactor * 0.12;
+  s.speed -= s.speed * turnLoss * dt;
 
   // 위치 적분 (위경도 + 씬 ENU 동시)
   const rad = (s.heading * Math.PI) / 180;

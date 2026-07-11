@@ -15,7 +15,7 @@ body {
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   background: #0b1520;
-  color: #e8eef2;
+  color: #e9eff4;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,6 +28,18 @@ body {
   display: block;
 }
 
+/* 화면 가장자리를 은은하게 눌러주는 비네트 — 후처리 없이 공짜 시네마틱 톤 */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 130% 105% at 50% 42%,
+    transparent 62%,
+    rgba(5, 12, 20, 0.26) 100%
+  );
+}
+
 /* ---------- HUD ---------- */
 
 .hud {
@@ -35,16 +47,23 @@ body {
   inset: 0;
   pointer-events: none;
   user-select: none;
+  font-feature-settings: "tnum";
 }
 
 .panel {
   position: absolute;
   pointer-events: auto;
-  background: rgba(10, 20, 30, 0.62);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 12px;
+  background: linear-gradient(
+    160deg,
+    rgba(13, 22, 32, 0.72),
+    rgba(9, 16, 25, 0.58)
+  );
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   padding: 12px 14px;
 }
 
@@ -52,40 +71,52 @@ body {
   top: 16px;
   left: 16px;
   display: flex;
-  gap: 18px;
+  gap: 22px;
   align-items: center;
+  padding: 12px 18px;
 }
 
 .readout {
   display: flex;
-  gap: 8px;
+  gap: 9px;
   align-items: center;
 }
 
 .readout svg {
-  color: #7fc4ef;
+  color: #6fc3ff;
   flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(111, 195, 255, 0.35));
 }
 
 .readout > div {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+}
+
+.readout + .readout {
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  padding-left: 22px;
 }
 
 .label {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: #93a4b2;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: #7f93a4;
 }
 
 .value {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .value.small {
   font-size: 13px;
+  font-weight: 550;
+  color: #cfdde8;
 }
 
 .top-right {
@@ -103,22 +134,26 @@ body {
   align-items: center;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 4px 11px;
   border-radius: 999px;
+  border: 1px solid transparent;
 }
 
 .badge-connected {
-  background: rgba(48, 209, 88, 0.16);
+  background: rgba(48, 209, 88, 0.13);
+  border-color: rgba(48, 209, 88, 0.25);
   color: #4cd964;
 }
 
 .badge-connecting {
-  background: rgba(255, 204, 0, 0.14);
+  background: rgba(255, 204, 0, 0.12);
+  border-color: rgba(255, 204, 0, 0.22);
   color: #ffd60a;
 }
 
 .badge-disconnected {
-  background: rgba(255, 69, 58, 0.14);
+  background: rgba(255, 69, 58, 0.12);
+  border-color: rgba(255, 69, 58, 0.22);
   color: #ff6b61;
 }
 
@@ -151,20 +186,22 @@ body {
   font-family: "SF Mono", ui-monospace, monospace;
 }
 
+/* ---------- 조작 패널 ---------- */
+
 .controls {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 26px;
-  padding: 14px 20px;
+  gap: 30px;
+  padding: 15px 22px 13px;
 }
 
 .control {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  width: 220px;
+  gap: 8px;
+  width: 230px;
 }
 
 .control-head {
@@ -174,24 +211,107 @@ body {
 }
 
 .control-head .value {
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.control-head .value .dir {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-right: 3px;
+}
+
+.dir-port {
+  color: #ff7a70;
+}
+
+.dir-stbd {
+  color: #4cd964;
+}
+
+/* 슬라이더 — 중앙(타)·0점(스로틀) 눈금이 있는 커스텀 트랙 */
+.slider-wrap {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.slider-wrap .tick {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
 }
 
 input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  accent-color: #3d9fdc;
+  height: 22px;
+  background: transparent;
   cursor: pointer;
 }
 
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.16)
+  );
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #6fc3ff;
+  border: 2px solid rgba(6, 14, 22, 0.9);
+  box-shadow: 0 0 8px rgba(111, 195, 255, 0.5);
+  transition: transform 0.12s ease;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6fc3ff;
+  border: 2px solid rgba(6, 14, 22, 0.9);
+}
+
+.control-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 22px;
+}
+
 .center-btn {
-  align-self: flex-start;
   font-size: 11px;
   color: #b8ccdb;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 3px 9px;
+  border-radius: 7px;
+  padding: 3px 10px;
   cursor: pointer;
+  transition: background 0.12s ease;
 }
 
 .center-btn:hover {
@@ -200,13 +320,20 @@ input[type="range"] {
 
 .hint {
   font-size: 10.5px;
-  color: #7b8fa0;
+  color: #75899a;
+  letter-spacing: 0.02em;
 }
+
+/* ---------- 미니맵 ---------- */
 
 .minimap {
   top: 16px;
   right: 16px;
   padding: 10px;
+}
+
+.minimap canvas {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
 .minimap-head {
@@ -228,10 +355,11 @@ input[type="range"] {
   width: 20px;
   height: 20px;
   color: #b8ccdb;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 5px;
   cursor: pointer;
+  transition: background 0.12s ease;
 }
 
 .minimap-zoom button:hover:not(:disabled) {

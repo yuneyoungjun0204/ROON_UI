@@ -3,7 +3,7 @@
 무인수상정(USV)을 3D로 시뮬레이션하고, MQTT로 [iot-monitoring-control](https://github.com/als8921/iot-monitoring-control) 플랫폼과 연동하는 웹 시뮬레이터입니다.
 
 - **3D 씬**: Three.js + React Three Fiber — 절차적 파도 바다, 로우폴리 USV, 추적 카메라
-- **시뮬레이션**: 타각/스로틀 → 선회율/가감속 → 침로·속력·위경도 적분 (운동학 모델, 20Hz)
+- **시뮬레이션**: 타각/스로틀 → 선회율/가감속 → 침로·속력·위경도 적분 (운동학 모델, 60Hz, 최고 20kn·3-tau 관성)
 - **MQTT 연동**: 브라우저에서 MQTT over WebSocket으로 브로커에 직접 접속
   - 발행: `devices/<token>/telemetry` — `{sensor, value, ts}` 형식으로 lat / lon / heading / sog / rudder
   - 구독: `devices/<id>/commands` — `{channel: "rudder"|"throttle", value}` 명령을 수신해 시뮬레이션에 반영
@@ -43,9 +43,9 @@ npm run dev
 
 | 입력 | 동작 |
 | --- | --- |
-| ← / → | 타각 (5°씩) |
-| ↑ / ↓ | 스로틀 (10%씩) |
-| Space | 타 중앙 |
+| ← / → (또는 A/D) | 누르는 동안 타각 증가, 떼면 타 중앙 자동 복원 |
+| ↑ / ↓ (또는 W/S) | 누르는 동안 스로틀 증감 (떼면 유지) |
+| Space | 타 즉시 중앙 |
 | 마우스 드래그 / 휠 | 카메라 회전 / 줌 |
 
 하단 패널의 슬라이더로도 조작할 수 있고, 관제 플랫폼에서 `rudder` / `throttle` 채널 명령을 보내면 원격 제어됩니다.

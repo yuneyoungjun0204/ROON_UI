@@ -15,6 +15,7 @@ interface ImportMetaEnv {
   readonly VITE_MQTT_PASSWORD?: string;
   readonly VITE_DEVICE_TOKEN?: string;
   readonly VITE_DEVICE_ID?: string;
+  readonly VITE_VWORLD_KEY?: string;
   readonly VITE_TELEMETRY_INTERVAL_MS?: string;
   readonly VITE_INITIAL_LAT?: string;
   readonly VITE_INITIAL_LON?: string;
