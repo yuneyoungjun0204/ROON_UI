@@ -573,22 +573,27 @@ input[type="range"]::-moz-range-thumb {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* 트랜지션 없음 — 시뮬이 60Hz로 갱신하므로 이미 매끄럽고,
- * width 트랜지션은 부호 전환 순간 반대편 잔상(노이즈)을 만든다 */
+/* 채움은 반폭 고정 + transform: scaleX — width 리페인트 잔상·트랜지션 노이즈 방지.
+ * transform은 GPU 합성만 거치므로 60Hz 갱신에도 픽셀 잔상이 남지 않는다 */
 .thruster-fill {
   position: absolute;
   top: 0;
   bottom: 0;
+  width: 50%;
+  transform: scaleX(0);
+  will-change: transform;
 }
 
 .thruster-fill.fwd {
   left: 50%;
+  transform-origin: left center;
   background: linear-gradient(90deg, rgba(76, 217, 100, 0.55), rgba(76, 217, 100, 0.95));
   border-radius: 0 5px 5px 0;
 }
 
 .thruster-fill.rev {
   right: 50%;
+  transform-origin: right center;
   background: linear-gradient(270deg, rgba(255, 122, 112, 0.55), rgba(255, 122, 112, 0.95));
   border-radius: 5px 0 0 5px;
 }

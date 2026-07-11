@@ -77,11 +77,14 @@ export function Wake() {
     const { positions, birth, life, size } = data;
     while (data.spawnAcc >= 1) {
       data.spawnAcc -= 1;
+      // 선수 물보라는 전진으로 물살을 가를 때만 — 후진·정지 중엔 선미 후류만
+      const useStern = thrustTotal > 2 && (Math.random() < 0.72 || usv.speed < 0.8);
+      if (!useStern && usv.speed <= 0.8) continue;
       const i = data.next;
       data.next = (i + 1) % COUNT;
       let px: number;
       let pz: number;
-      if (thrustTotal > 2 && (Math.random() < 0.72 || speed < 0.8)) {
+      if (useStern) {
         // 선미 프로펠러 후류 — 각 헐의 쓰러스터 출력 비율대로 뿜는다
         // (한쪽만 추진하면 그쪽 헐 뒤에만 거품이 남는다)
         const side = Math.random() < thrustS / thrustTotal ? 1 : -1;

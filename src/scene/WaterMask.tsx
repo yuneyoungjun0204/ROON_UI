@@ -459,17 +459,17 @@ export function WaterMask({ sunDir }: { sunDir: THREE.Vector3 }) {
       const fwdZ = -Math.cos(rad); // 북쪽 = -z
       const stbX = -fwdZ; // 우현 방향
       const stbZ = fwdX;
-      const dir = Math.sign(usv.speed || 1);
       const base = Math.min(spd / 7, 1);
       // 각 헐의 웨이크는 그 쪽 쓰러스터 출력(프로펠러 후류)에서만 나온다 —
       // 한쪽만 추진하면 그쪽 헐 뒤에만 물자국이 남고, 차동 선회 시 좌우 비대칭이 보인다.
+      // 쓰러스터는 후미 고정 장착이므로 후진 중에도 방출점은 항상 선미다.
       const emit = (lateral: number, thrustPct: number) => {
         const use = Math.abs(thrustPct) / 100; // 0~1
         if (use < 0.04) return; // 쓰러스터가 꺼진 헐에서는 웨이크 없음
         const strength = Math.min(1, Math.pow(use, 0.7) * (0.45 + 0.55 * base));
         trail[ws.nextIdx].set(
-          usv.x - fwdX * WAKE_STERN_AFT_M * dir + stbX * lateral,
-          usv.z - fwdZ * WAKE_STERN_AFT_M * dir + stbZ * lateral,
+          usv.x - fwdX * WAKE_STERN_AFT_M + stbX * lateral,
+          usv.z - fwdZ * WAKE_STERN_AFT_M + stbZ * lateral,
           t,
           strength,
         );
