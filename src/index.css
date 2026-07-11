@@ -514,8 +514,32 @@ input[type="range"]::-moz-range-thumb {
 /* ---------- 좌/우 쓰러스터 게이지 ---------- */
 
 .control.thrusters {
-  width: 150px;
-  gap: 7px;
+  width: 320px;
+  gap: 8px;
+}
+
+.control.thrusters .control-foot {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.control.thrusters .control-foot .hint {
+  margin-left: auto;
+}
+
+/* 컨트롤 패널 내 배터리 열 */
+.control.battery-panel {
+  width: 190px;
+  gap: 10px;
+}
+
+.control.battery-panel .battery {
+  width: 100%;
+}
+
+.control.battery-panel .battery-shell {
+  flex: 1;
+  height: 13px;
 }
 
 .thruster-row {
@@ -534,9 +558,9 @@ input[type="range"]::-moz-range-thumb {
 .thruster-bar {
   position: relative;
   flex: 1;
-  height: 10px;
+  height: 13px;
   background: rgba(255, 255, 255, 0.07);
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -597,33 +621,49 @@ input[type="range"]::-moz-range-thumb {
   animation: live-blink 1.6s ease-in-out infinite;
 }
 
-.mode-status.mode-auto {
+/* 색상 규칙은 상단 배지(.mode-status)와 컨트롤 패널 상태줄(.status-line)이 공유 */
+.mode-auto {
   color: #ffd9a0;
   border-color: rgba(255, 170, 60, 0.45);
 }
 
-.mode-status.mode-auto .mode-dot {
+.mode-auto .mode-dot {
   background: #ffb84d;
   box-shadow: 0 0 8px rgba(255, 184, 77, 0.8);
 }
 
-.mode-status.mode-auto svg {
+.mode-auto svg {
   color: #ffb84d;
 }
 
-.mode-status.mode-manual {
+.mode-manual {
   color: #b9dcff;
   border-color: rgba(110, 190, 255, 0.35);
 }
 
-.mode-status.mode-manual .mode-dot {
+.mode-manual .mode-dot {
   background: #6fc3ff;
   box-shadow: 0 0 8px rgba(111, 195, 255, 0.8);
   animation: none;
 }
 
-.mode-status.mode-manual svg {
+.mode-manual svg {
   color: #6fc3ff;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding-top: 2px;
+}
+
+.control.status-panel {
+  width: 185px;
+  gap: 10px;
 }
 
 /* ---------- 선수 카메라 카드 ---------- */

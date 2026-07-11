@@ -40,6 +40,28 @@ function StatusBadge() {
   );
 }
 
+/** 운항 모드 표시 내용 — 상단 배지와 컨트롤 패널 상태줄이 공유 */
+function ModeIndicator({ prefix }: { prefix?: string }) {
+  const autopilot = useSimStore((s) => s.autopilot);
+  const returning = useSimStore((s) => s.returningToStation);
+  const Icon = autopilot ? (returning ? Anchor : Bot) : Gamepad2;
+  const label = autopilot
+    ? returning
+      ? "스테이션 복귀 중"
+      : "자율 운항 중"
+    : "수동 조작 중";
+  return (
+    <>
+      <span className="mode-dot" />
+      <Icon size={15} />
+      <span>
+        {prefix}
+        {label}
+      </span>
+    </>
+  );
+}
+
 /** 화면 중앙 오버레이 — R키 홀드 초기화 게이지, 배터리 방전 견인 안내 */
 function CenterOverlay() {
   const resetProgress = useSimStore((s) => s.resetProgress);
@@ -122,7 +144,6 @@ export function Hud() {
   const returnToStation = useSimStore((s) => s.returnToStation);
   const emergencyStop = useSimStore((s) => s.emergencyStop);
   const autopilot = useSimStore((s) => s.autopilot);
-  const returningToStation = useSimStore((s) => s.returningToStation);
 
   useEffect(() => {
     // 키를 누르는 "동안" 지령을 램프한다 (실제 반영은 시뮬 루프에서 dt 기반으로).
@@ -163,23 +184,7 @@ export function Hud() {
     <div className="hud">
       {/* 운항 모드 상태 — 스테이션 복귀 / 자율 운항 / 수동 조작 */}
       <div className={`panel mode-status ${autopilot ? "mode-auto" : "mode-manual"}`}>
-        <span className="mode-dot" />
-        {autopilot ? (
-          returningToStation ? (
-            <Anchor size={15} />
-          ) : (
-            <Bot size={15} />
-          )
-        ) : (
-          <Gamepad2 size={15} />
-        )}
-        <span>
-          {autopilot
-            ? returningToStation
-              ? "스테이션 복귀 중"
-              : "자율 운항 중"
-            : "수동 조작 중"}
-        </span>
+        <ModeIndicator />
       </div>
 
       <div className="panel readouts">
@@ -224,7 +229,6 @@ export function Hud() {
       </div>
 
       <div className="panel top-right">
-        <BatteryStatus />
         <StatusBadge />
         <div className="topic">{`devices/${config.deviceToken}/telemetry`}</div>
         {lastCommand && (
@@ -256,68 +260,36 @@ export function Hud() {
             비상정지
           </button>
         </div>
-        <div className="control">
+        <div className="control thrusters">
           <div className="control-head">
-            <span className="label">STEER</span>
-            <span className="value">
-              {usv.steer < -0.5 ? (
-                <span className="dir dir-port">PORT</span>
-              ) : usv.steer > 0.5 ? (
-                <span className="dir dir-stbd">STBD</span>
-              ) : null}
-              {Math.abs(usv.steer).toFixed(0)}%
-            </span>
+            <span className="label">THRUSTERS</span>
+            <span className="hint">좌/우 차동 추진 · 후미 장착</span>
           </div>
-          <div className="slider-wrap">
-            {/* 조향 중앙(0) 눈금 */}
-            <div className="tick" style={{ left: "50%" }} />
-            <input
-              type="range"
-              min={-100}
-              max={100}
-              step={1}
-              value={usv.steer}
-              onChange={(e) => setSteer(Number(e.target.value))}
-            />
-          </div>
+          <ThrusterBar label="L" value={usv.thrustPort} />
+          <ThrusterBar label="R" value={usv.thrustStbd} />
           <div className="control-foot">
             <button className="center-btn" onClick={() => setSteer(0)}>
               조향 중앙
             </button>
-            <span className="hint">←/→ 또는 A/D</span>
-          </div>
-        </div>
-        <div className="control">
-          <div className="control-head">
-            <span className="label">THROTTLE</span>
-            <span className="value">{usv.throttle.toFixed(0)}%</span>
-          </div>
-          <div className="slider-wrap">
-            {/* 스로틀 0% 눈금 (범위 -100~100 → 중앙) */}
-            <div className="tick" style={{ left: "50%" }} />
-            <input
-              type="range"
-              min={-100}
-              max={100}
-              step={5}
-              value={usv.throttle}
-              onChange={(e) => setThrottle(Number(e.target.value))}
-            />
-          </div>
-          <div className="control-foot">
             <button className="center-btn" onClick={() => setThrottle(0)}>
               스로틀 0 (Space)
             </button>
-            <span className="hint">↑/↓ 또는 W/S · 떼면 유지</span>
+            <span className="hint">←/→ 조향 · ↑/↓ 스로틀</span>
           </div>
         </div>
-        <div className="control thrusters">
+        <div className="control battery-panel">
           <div className="control-head">
-            <span className="label">THRUSTERS</span>
+            <span className="label">BATTERY</span>
           </div>
-          <ThrusterBar label="L" value={usv.thrustPort} />
-          <ThrusterBar label="R" value={usv.thrustStbd} />
-          <span className="hint">좌/우 차동 추진 · 후미 장착</span>
+          <BatteryStatus />
+        </div>
+        <div className="control status-panel">
+          <div className="control-head">
+            <span className="label">STATUS</span>
+          </div>
+          <div className={`status-line ${autopilot ? "mode-auto" : "mode-manual"}`}>
+            <ModeIndicator prefix="현재 상태: " />
+          </div>
         </div>
       </div>
 
