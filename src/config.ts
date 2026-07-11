@@ -23,10 +23,11 @@ export const config = {
   deviceToken: env.VITE_DEVICE_TOKEN ?? "sim-usv-1",
   /** 명령 구독 토픽에 쓰는 기기 ID: devices/<id>/commands */
   deviceId: env.VITE_DEVICE_ID ?? "1",
+  /** VWorld 오픈 API 키 — 있으면 위성 지도/실제 지형, 없으면 절차적 바다 */
   vworldKey: env.VITE_VWORLD_KEY ?? "",
   /** 텔레메트리 발행 주기 (ms) */
   telemetryIntervalMs: Number(env.VITE_TELEMETRY_INTERVAL_MS ?? 2000),
-  /** 시뮬레이션 시작 위치 (부산 앞바다) */
+  /** 시뮬레이션 시작 위치 (기본: 대청호 — 위성/지형 데이터 기준점) */
   initialLat: Number(env.VITE_INITIAL_LAT ?? 36.47655),
   initialLon: Number(env.VITE_INITIAL_LON ?? 127.48375),
 };
