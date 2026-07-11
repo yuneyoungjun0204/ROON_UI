@@ -113,7 +113,9 @@ function BatteryStatus() {
   );
 }
 
-/** 좌/우 쓰러스터 출력 게이지 — 중앙 기준으로 정방향(초록)/역방향(빨강) 채움 */
+/** 좌/우 쓰러스터 출력 게이지 — 중앙 기준으로 정방향(초록)/역방향(빨강) 채움.
+ * 정/역 채움을 별도 요소로 두고 트랜지션 없이 그린다 — 부호가 바뀌는 순간
+ * 앵커(left/right)가 뒤바뀌며 이전 폭이 반대편에 잔상으로 남는 문제 방지. */
 function ThrusterBar({ label, value }: { label: string; value: number }) {
   const pct = Math.min(100, Math.abs(value)); // 0~100
   const forward = value >= 0;
@@ -122,14 +124,8 @@ function ThrusterBar({ label, value }: { label: string; value: number }) {
       <span className="thruster-label">{label}</span>
       <div className="thruster-bar">
         <div className="thruster-center" />
-        <div
-          className={`thruster-fill ${forward ? "fwd" : "rev"}`}
-          style={
-            forward
-              ? { left: "50%", width: `${pct / 2}%` }
-              : { right: "50%", width: `${pct / 2}%` }
-          }
-        />
+        <div className="thruster-fill fwd" style={{ width: `${forward ? pct / 2 : 0}%` }} />
+        <div className="thruster-fill rev" style={{ width: `${forward ? 0 : pct / 2}%` }} />
       </div>
       <span className="thruster-value">{value.toFixed(0)}%</span>
     </div>
