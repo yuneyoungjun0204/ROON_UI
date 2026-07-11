@@ -13,6 +13,7 @@ import { Wake } from "./Wake";
 import { GeoMapSurface } from "./GeoMapSurface";
 import { WaterMask } from "./WaterMask";
 import { RouteLine } from "./RouteLine";
+import { StationZone } from "./StationZone";
 import { FpvRenderPass } from "./FpvCamera";
 import { useSimStore } from "../store";
 import { waveHeight, lakeWaveHeight, WATER_LEVEL_Y } from "../sim/waves";
@@ -128,6 +129,7 @@ export function Scene() {
       )}
       {!config.vworldKey && <Wake />}
       <RouteLine />
+      <StationZone />
       <Usv />
       <FollowCamera />
       <FpvRenderPass />

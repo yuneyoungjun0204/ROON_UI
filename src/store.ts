@@ -3,7 +3,7 @@
 // 3D 씬은 리렌더 없이 getState()로 매 프레임 읽는다.
 
 import { create } from "zustand";
-import { config } from "./config";
+import { config, STATION_ZONE_RADIUS_M } from "./config";
 import {
   createUsvState,
   stepUsv,
@@ -17,7 +17,7 @@ import { getCurrentWaterMask } from "./scene/waterMaskTexture";
 import { localMetersToLonLat, type LocalPoint } from "./geo/webMercator";
 import { sampleElevationFromCache } from "./geo/elevation";
 import { planRoute, type PlannedRoute } from "./nav/pathPlanner";
-import { followRoute } from "./nav/autopilot";
+import { createFollowState, followRoute } from "./nav/autopilot";
 
 export type MqttStatus = "disconnected" | "connecting" | "connected";
 
@@ -33,6 +33,8 @@ interface SimStore {
   route: PlannedRoute | null;
   /** 자동 항해 중인지 */
   autopilot: boolean;
+  /** 자동 항해가 스테이션 복귀인지 (상태 표시용) */
+  returningToStation: boolean;
   /** 통과한 웨이포인트 수 — waypoints[0..reachedCount)는 도달 완료 */
   reachedCount: number;
   setRudderCmd: (deg: number) => void;
@@ -44,10 +46,36 @@ interface SimStore {
   undoWaypoint: () => void;
   clearWaypoints: () => void;
   setAutopilot: (on: boolean) => void;
+  /** 스테이션 존(시작 위치)으로 자동 복귀 — 기존 웨이포인트는 버린다 */
+  returnToStation: () => void;
 }
 
-/** 자동 항해 진행 인덱스 — 60Hz로 갱신되므로 스토어 밖에 둔다. 재계획 때 0으로 리셋. */
-let routeProgress = 0;
+/** 자동 항해 추종 상태 — 60Hz로 갱신되므로 스토어 밖에 둔다. 재계획 때 리셋. */
+let followState = createFollowState();
+
+/** 경로 대이탈 시 자동 재계획 — 관성 때문에 크게 벗어나면(급반전 지시 등)
+ * 순수 추종이 경로 밖에서 맴돌 수 있어, 현재 위치 기준으로 항로를 다시 만든다. */
+const OFF_PATH_REPLAN_M = 20;
+const REPLAN_COOLDOWN_MS = 4000;
+let lastOffPathReplanAt = 0;
+let offPathReplanCount = 0; // 디버그 관측용
+
+/** 도착 후 정지 단계 — 타력으로 밀려나지 않도록 역추진으로 확실히 멈춘 뒤에
+ * 수동 조작으로 전환한다. 이 단계 동안에는 자동 항해 상태가 유지된다. */
+let stoppingAfterArrival = false;
+const STOP_SPEED_MS = 0.15; // 이 속도 이하면 정지 완료로 간주
+
+// 개발 편의: 콘솔에서 내부 항법 상태를 들여다볼 수 있게 노출
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  Object.defineProperty(window, "__nav", {
+    configurable: true,
+    get: () => ({
+      state: useSimStore.getState(),
+      followState,
+      offPathReplanCount,
+    }),
+  });
+}
 
 /** 경로 계획용 항행 판정 — 충돌 샘플(선체 절반)만큼 여유를 두어
  * 계획한 경로를 따라가다 물가 충돌 판정에 걸리지 않게 한다. */
@@ -77,7 +105,8 @@ function replanRoute(
 ): PlannedRoute | null {
   const remaining = waypoints.slice(reachedCount);
   if (remaining.length === 0) return null;
-  routeProgress = 0;
+  followState = createFollowState();
+  stoppingAfterArrival = false;
   return planRoute({ x: usv.x, z: usv.z }, remaining, isNavigableForRoute);
 }
 
@@ -89,6 +118,7 @@ export const useSimStore = create<SimStore>((set) => ({
   waypoints: [],
   route: null,
   autopilot: false,
+  returningToStation: false,
   reachedCount: 0,
   setRudderCmd: (deg) =>
     set((st) => ({ usv: { ...st.usv, rudderCmd: clampRudder(deg) } })),
@@ -102,26 +132,51 @@ export const useSimStore = create<SimStore>((set) => ({
       if (!isNavigableForRoute(p.x, p.z)) return {}; // 물 밖 클릭은 무시
       const waypoints = [...st.waypoints, p];
       const route = replanRoute(st.usv, waypoints, st.reachedCount);
-      // 웨이포인트를 찍으면 곧바로 자동 항해 시작
-      return { waypoints, route, autopilot: route != null };
+      // 웨이포인트를 찍으면 곧바로 자동 항해 시작 (일반 항해 모드)
+      return { waypoints, route, autopilot: route != null, returningToStation: false };
     }),
   undoWaypoint: () =>
     set((st) => {
       if (st.waypoints.length <= st.reachedCount) return {};
       const waypoints = st.waypoints.slice(0, -1);
       const route = replanRoute(st.usv, waypoints, st.reachedCount);
-      return { waypoints, route, autopilot: st.autopilot && route != null };
+      return {
+        waypoints,
+        route,
+        autopilot: st.autopilot && route != null,
+        returningToStation: st.returningToStation && route != null,
+      };
     }),
   clearWaypoints: () => {
-    routeProgress = 0;
-    set({ waypoints: [], route: null, autopilot: false, reachedCount: 0 });
+    followState = createFollowState();
+    set({
+      waypoints: [],
+      route: null,
+      autopilot: false,
+      returningToStation: false,
+      reachedCount: 0,
+    });
   },
   setAutopilot: (on) =>
     set((st) => {
-      if (!on) return { autopilot: false };
+      if (!on) return { autopilot: false, returningToStation: false };
       const route = replanRoute(st.usv, st.waypoints, st.reachedCount);
       if (!route) return {};
       return { autopilot: true, route };
+    }),
+  returnToStation: () =>
+    set((st) => {
+      // 이미 스테이션 존 안에 있으면 아무것도 하지 않는다
+      if (Math.hypot(st.usv.x, st.usv.z) <= STATION_ZONE_RADIUS_M) return {};
+      const waypoints: LocalPoint[] = [{ x: 0, z: 0 }]; // 스테이션 존 중심 = 로컬 원점
+      const route = replanRoute(st.usv, waypoints, 0);
+      return {
+        waypoints,
+        route,
+        reachedCount: 0,
+        autopilot: route != null,
+        returningToStation: route != null,
+      };
     }),
 }));
 
@@ -232,36 +287,72 @@ export function startSimLoop(): () => void {
 
     // 자동 항해 — 계획 경로를 추종. 수동 키 입력이 들어오면 즉시 해제.
     const navUpdates: Partial<
-      Pick<SimStore, "autopilot" | "route" | "reachedCount">
+      Pick<SimStore, "autopilot" | "route" | "reachedCount" | "returningToStation">
     > = {};
+    let brakingThisTick = false;
     if (autopilot && route) {
       const manual =
         controls.left || controls.right || controls.throttleUp || controls.throttleDown;
       if (manual) {
         navUpdates.autopilot = false;
+        navUpdates.returningToStation = false;
+        stoppingAfterArrival = false;
+      } else if (stoppingAfterArrival) {
+        // 도착 후 정지 단계 — 타력에 밀려 존 밖으로 나가지 않게 역추진으로 멈춘다.
+        rudderCmd = 0;
+        if (usv.speed > STOP_SPEED_MS) {
+          throttle = -25;
+          brakingThisTick = true;
+        } else {
+          // 완전 정지 — 이제 수동 조작으로 전환
+          throttle = 0;
+          stoppingAfterArrival = false;
+          navUpdates.autopilot = false;
+          navUpdates.returningToStation = false;
+          navUpdates.route = null;
+          navUpdates.reachedCount = waypoints.length;
+        }
       } else {
-        const out = followRoute(usv, route.points, routeProgress);
-        routeProgress = out.progress;
+        const out = followRoute(usv, route.points, followState);
         rudderCmd = out.rudderCmd;
         throttle = out.throttle;
         // 통과한 웨이포인트 수 갱신 (route는 미도달 웨이포인트만 담고 있다)
         const base = waypoints.length - route.wpIndex.length;
         let passed = 0;
-        while (passed < route.wpIndex.length && routeProgress >= route.wpIndex[passed]) {
+        while (passed < route.wpIndex.length && followState.progress >= route.wpIndex[passed]) {
           passed += 1;
         }
         if (out.arrived) {
-          navUpdates.autopilot = false;
-          navUpdates.route = null;
-          navUpdates.reachedCount = waypoints.length;
+          // 즉시 해제하지 않고 정지 단계로 진입 — 속도 0까지 자동 제어 유지
+          stoppingAfterArrival = true;
+          rudderCmd = 0;
+          if (usv.speed > STOP_SPEED_MS) {
+            throttle = -25;
+            brakingThisTick = true;
+          }
         } else if (base + passed > reachedCount) {
           navUpdates.reachedCount = base + passed;
+        }
+
+        // 경로 대이탈 → 현재 위치에서 재계획 (쿨다운으로 과도한 재계획 방지)
+        if (
+          !out.arrived &&
+          out.crossTrack > OFF_PATH_REPLAN_M &&
+          now - lastOffPathReplanAt > REPLAN_COOLDOWN_MS
+        ) {
+          lastOffPathReplanAt = now;
+          offPathReplanCount += 1;
+          const newReached = navUpdates.reachedCount ?? reachedCount;
+          const newRoute = replanRoute(usv, waypoints, newReached);
+          if (newRoute) navUpdates.route = newRoute;
         }
       }
     }
 
     const next = { ...usv, rudderCmd, throttle };
     stepUsv(next, dt);
+    // 정지 단계의 역추진이 후진으로 이어지지 않게 — 멈추는 게 목적이다
+    if (brakingThisTick && next.speed < 0) next.speed = 0;
     // 실제 수역 경계(OSM)를 진실로 삼는다 — 그 안이면 DEM이 물을 육지로 잘못 잡아도 항행 가능.
     // 폴리곤이 아직 없으면(로드 전/실패) DEM 높이로 폴백.
     const blocked =

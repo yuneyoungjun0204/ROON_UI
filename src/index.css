@@ -193,8 +193,44 @@ body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 30px;
-  padding: 15px 22px 13px;
+  flex-wrap: wrap; /* 스테이션 복귀 버튼(width 100%)이 상단 한 줄을 차지 */
+  gap: 12px 30px;
+  padding: 12px 22px 13px;
+}
+
+.station-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: #ffd9a0;
+  background: rgba(255, 170, 60, 0.12);
+  border: 1px solid rgba(255, 170, 60, 0.38);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.station-btn:hover:not(:disabled) {
+  background: rgba(255, 170, 60, 0.22);
+  border-color: rgba(255, 170, 60, 0.6);
+}
+
+.station-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.station-btn-note {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ec7e8;
+  letter-spacing: 0.06em;
 }
 
 .control {
@@ -322,6 +358,57 @@ input[type="range"]::-moz-range-thumb {
   font-size: 10.5px;
   color: #75899a;
   letter-spacing: 0.02em;
+}
+
+/* ---------- 운항 모드 상태 ---------- */
+
+.mode-status {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.mode-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+.mode-status.mode-auto {
+  color: #ffd9a0;
+  border-color: rgba(255, 170, 60, 0.45);
+}
+
+.mode-status.mode-auto .mode-dot {
+  background: #ffb84d;
+  box-shadow: 0 0 8px rgba(255, 184, 77, 0.8);
+}
+
+.mode-status.mode-auto svg {
+  color: #ffb84d;
+}
+
+.mode-status.mode-manual {
+  color: #b9dcff;
+  border-color: rgba(110, 190, 255, 0.35);
+}
+
+.mode-status.mode-manual .mode-dot {
+  background: #6fc3ff;
+  box-shadow: 0 0 8px rgba(111, 195, 255, 0.8);
+  animation: none;
+}
+
+.mode-status.mode-manual svg {
+  color: #6fc3ff;
 }
 
 /* ---------- 선수 카메라 카드 ---------- */

@@ -2,10 +2,21 @@
 // 키보드: ←/→ 타각, ↑/↓ 스로틀, Space 타 중앙.
 
 import { useEffect } from "react";
-import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare, Video } from "lucide-react";
+import {
+  Navigation,
+  Gauge,
+  Wifi,
+  WifiOff,
+  Loader2,
+  TerminalSquare,
+  Video,
+  Anchor,
+  Bot,
+  Gamepad2,
+} from "lucide-react";
 import { useSimStore } from "../store";
 import { MAX_RUDDER_DEG } from "../sim/usvSim";
-import { config } from "../config";
+import { config, STATION_ZONE_RADIUS_M } from "../config";
 import { controls, resetControls } from "../sim/controls";
 import { Minimap } from "./SatelliteMinimap";
 
@@ -29,6 +40,9 @@ export function Hud() {
   const lastCommand = useSimStore((s) => s.lastCommand);
   const setRudderCmd = useSimStore((s) => s.setRudderCmd);
   const setThrottle = useSimStore((s) => s.setThrottle);
+  const returnToStation = useSimStore((s) => s.returnToStation);
+  const autopilot = useSimStore((s) => s.autopilot);
+  const returningToStation = useSimStore((s) => s.returningToStation);
 
   useEffect(() => {
     // 키를 누르는 "동안" 지령을 램프한다 (실제 반영은 시뮬 루프에서 dt 기반으로).
@@ -39,10 +53,8 @@ export function Hud() {
       else if (key === "w" || e.key === "ArrowUp") controls.throttleUp = down;
       else if (key === "s" || e.key === "ArrowDown") controls.throttleDown = down;
       else if (e.key === " ") {
-        if (down) {
-          useSimStore.getState().setRudderCmd(0);
-          controls.steering = false;
-        }
+        // Space = 스로틀 0 (정지 지령)
+        if (down) useSimStore.getState().setThrottle(0);
       } else return;
       e.preventDefault();
     };
@@ -59,27 +71,55 @@ export function Hud() {
   }, []);
 
   const sog = usv.speed * MS_TO_KN;
+  // 침로를 -180°~+180° 범위로 변환 (0=북, 시계방향 양수)
+  const signedHeading = ((usv.heading + 180) % 360) - 180;
+  // 스테이션 존(원점 반경) 안이면 복귀 버튼 비활성
+  const inStationZone = Math.hypot(usv.x, usv.z) <= STATION_ZONE_RADIUS_M;
 
   return (
     <div className="hud">
+      {/* 운항 모드 상태 — 스테이션 복귀 / 자율 운항 / 수동 조작 */}
+      <div className={`panel mode-status ${autopilot ? "mode-auto" : "mode-manual"}`}>
+        <span className="mode-dot" />
+        {autopilot ? (
+          returningToStation ? (
+            <Anchor size={15} />
+          ) : (
+            <Bot size={15} />
+          )
+        ) : (
+          <Gamepad2 size={15} />
+        )}
+        <span>
+          {autopilot
+            ? returningToStation
+              ? "스테이션 복귀 중"
+              : "자율 운항 중"
+            : "수동 조작 중"}
+        </span>
+      </div>
+
       <div className="panel readouts">
         <div className="readout">
           <Navigation size={15} style={{ transform: `rotate(${usv.heading}deg)` }} />
           <div>
-            <span className="label">HDG</span>
-            <span className="value">{usv.heading.toFixed(1).padStart(5, "0")}°</span>
+            <span className="label">Heading</span>
+            <span className="value">
+              {signedHeading > 0 ? "+" : ""}
+              {signedHeading.toFixed(1)}°
+            </span>
           </div>
         </div>
         <div className="readout">
           <Gauge size={15} />
           <div>
-            <span className="label">SOG</span>
-            <span className="value">{sog.toFixed(1)} kn</span>
+            <span className="label">Speed</span>
+            <span className="value">{sog.toFixed(1)} knot</span>
           </div>
         </div>
         <div className="readout wide">
           <div>
-            <span className="label">POSITION</span>
+            <span className="label">GPS</span>
             <span className="value small">
               {usv.lat.toFixed(5)}, {usv.lon.toFixed(5)}
             </span>
@@ -112,6 +152,16 @@ export function Hud() {
       </div>
 
       <div className="panel controls">
+        <button
+          className="station-btn"
+          onClick={returnToStation}
+          disabled={inStationZone}
+          title={inStationZone ? "이미 스테이션 존 안에 있습니다" : undefined}
+        >
+          <Anchor size={13} />
+          {inStationZone ? "스테이션 존 내 위치" : "스테이션 복귀"}
+          {autopilot && !inStationZone && <span className="station-btn-note">자동 항해 중</span>}
+        </button>
         <div className="control">
           <div className="control-head">
             <span className="label">RUDDER</span>
@@ -138,7 +188,7 @@ export function Hud() {
           </div>
           <div className="control-foot">
             <button className="center-btn" onClick={() => setRudderCmd(0)}>
-              타 중앙 (Space)
+              타 중앙
             </button>
             <span className="hint">←/→ 또는 A/D</span>
           </div>
@@ -161,6 +211,9 @@ export function Hud() {
             />
           </div>
           <div className="control-foot">
+            <button className="center-btn" onClick={() => setThrottle(0)}>
+              스로틀 0 (Space)
+            </button>
             <span className="hint">↑/↓ 또는 W/S · 떼면 유지</span>
           </div>
         </div>

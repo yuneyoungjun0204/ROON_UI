@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Minus, Play, Square, Trash2, Undo2 } from "lucide-react";
-import { config } from "../config";
+import { config, STATION_ZONE_RADIUS_M } from "../config";
 import { localMetersToLonLat, lonLatToLocalMeters } from "../geo/webMercator";
-import { trail, useSimStore } from "../store";
+import { useSimStore } from "../store";
 
 const CSS_SIZE = 285;
 const TILE_SIZE = 256;
@@ -153,18 +153,18 @@ export function Minimap() {
         const projected = project(point.lon, point.lat, zoom);
         return { px: half + (projected.x - center.x), py: half + (projected.y - center.y) };
       };
+      const mpp = metersPerPixel(usv.lat, zoom);
 
-      if (trail.length >= 4) {
-        ctx.strokeStyle = "rgba(116, 217, 255, 0.92)";
-        ctx.lineWidth = 2;
-        ctx.lineJoin = "round";
+      // 스테이션 존 — 시작 위치(로컬 원점) 반경 원
+      {
+        const { px, py } = toCanvas(0, 0);
+        const r = STATION_ZONE_RADIUS_M / mpp;
         ctx.beginPath();
-        for (let i = 0; i < trail.length; i += 2) {
-          const { px, py } = toCanvas(trail[i], trail[i + 1]);
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.lineTo(half, half);
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 212, 77, 0.14)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 212, 77, 0.9)";
+        ctx.lineWidth = 1.5;
         ctx.stroke();
       }
 
@@ -222,7 +222,6 @@ export function Minimap() {
       ctx.textAlign = "center";
       ctx.fillText("N", half, 12);
 
-      const mpp = metersPerPixel(usv.lat, zoom);
       const barMeters = pickScaleBar(mpp);
       const barPx = barMeters / mpp;
       ctx.strokeStyle = "rgba(235, 246, 255, 0.85)";
