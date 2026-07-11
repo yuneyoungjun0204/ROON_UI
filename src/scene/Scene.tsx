@@ -13,6 +13,7 @@ import { Wake } from "./Wake";
 import { GeoMapSurface } from "./GeoMapSurface";
 import { WaterMask } from "./WaterMask";
 import { RouteLine } from "./RouteLine";
+import { FpvRenderPass } from "./FpvCamera";
 import { useSimStore } from "../store";
 import { waveHeight, lakeWaveHeight, WATER_LEVEL_Y } from "../sim/waves";
 import { makeSkyMaterial, SKY_PALETTE } from "./skyGlsl";
@@ -129,6 +130,7 @@ export function Scene() {
       <RouteLine />
       <Usv />
       <FollowCamera />
+      <FpvRenderPass />
     </Canvas>
   );
 }

@@ -2,7 +2,7 @@
 // 키보드: ←/→ 타각, ↑/↓ 스로틀, Space 타 중앙.
 
 import { useEffect } from "react";
-import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare } from "lucide-react";
+import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare, Video } from "lucide-react";
 import { useSimStore } from "../store";
 import { MAX_RUDDER_DEG } from "../sim/usvSim";
 import { config } from "../config";
@@ -85,6 +85,19 @@ export function Hud() {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="panel camera-card">
+        <div className="camera-head">
+          <Video size={13} />
+          <span className="label">카메라</span>
+          <span className="camera-live">
+            <span className="camera-live-dot" />
+            LIVE
+          </span>
+        </div>
+        {/* 실제 영상은 3D 캔버스가 이 영역 위치에 시저 렌더링한다 — 배경 투명 유지 */}
+        <div id="fpv-view" className="camera-view" />
       </div>
 
       <div className="panel top-right">

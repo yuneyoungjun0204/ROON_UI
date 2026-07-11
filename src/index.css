@@ -324,6 +324,69 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.02em;
 }
 
+/* ---------- 선수 카메라 카드 ---------- */
+
+/* 뷰 영역은 캔버스(FPV 시저 렌더)가 그대로 비쳐야 하므로
+ * 패널 기본 배경·블러를 끄고 헤더에만 배경을 준다. */
+.camera-card {
+  top: 96px;
+  left: 16px;
+  padding: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.camera-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: linear-gradient(
+    160deg,
+    rgba(13, 22, 32, 0.82),
+    rgba(9, 16, 25, 0.72)
+  );
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.camera-head svg {
+  color: #6fc3ff;
+  filter: drop-shadow(0 0 6px rgba(111, 195, 255, 0.35));
+}
+
+.camera-live {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #ff7a7a;
+}
+
+.camera-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ff5252;
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.camera-view {
+  width: 268px;
+  height: 151px;
+  background: transparent;
+}
+
 /* ---------- 미니맵 ---------- */
 
 .minimap {

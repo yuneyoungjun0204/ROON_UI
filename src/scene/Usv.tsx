@@ -10,6 +10,7 @@ import { waveHeight, lakeWaveHeight, WATER_LEVEL_Y } from "../sim/waves";
 import { MAX_SPEED_MS } from "../sim/usvSim";
 import { useSimStore } from "../store";
 import { config } from "../config";
+import { fpvCamera } from "./FpvCamera";
 
 /** 수면 높이 샘플러 — 지오맵(호수) 모드면 잔잔한 호수 너울, 아니면 바다 파도 */
 const waterHeight = config.vworldKey ? lakeWaveHeight : waveHeight;
@@ -282,6 +283,8 @@ export function Usv() {
   return (
     <group ref={groupRef}>
       <primitive object={ship.model} />
+      {/* 선수 카메라 — 배의 자세(침로·히브·롤·피치)를 그대로 물려받는다 */}
+      <primitive object={fpvCamera} />
     </group>
   );
 }
