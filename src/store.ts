@@ -11,11 +11,13 @@ import {
   clampThrottle,
   type UsvState,
 } from "./sim/usvSim";
-import { applyKeyboardControls } from "./sim/controls";
+import { applyKeyboardControls, controls } from "./sim/controls";
 import { isPointInWater, type WaterPolygon } from "./geo/waterArea";
 import { getCurrentWaterMask } from "./scene/waterMaskTexture";
-import { localMetersToLonLat } from "./geo/webMercator";
+import { localMetersToLonLat, type LocalPoint } from "./geo/webMercator";
 import { sampleElevationFromCache } from "./geo/elevation";
+import { planRoute, type PlannedRoute } from "./nav/pathPlanner";
+import { followRoute } from "./nav/autopilot";
 
 export type MqttStatus = "disconnected" | "connecting" | "connected";
 
@@ -25,11 +27,58 @@ interface SimStore {
   waterPolygons: WaterPolygon[];
   /** 마지막으로 수신한 원격 명령 설명 (HUD 표시용) */
   lastCommand: string | null;
+  /** 사용자가 찍은 웨이포인트 (씬 ENU 미터) */
+  waypoints: LocalPoint[];
+  /** 계획된 항로 — 웨이포인트가 바뀔 때마다 현재 위치 기준으로 다시 계산 */
+  route: PlannedRoute | null;
+  /** 자동 항해 중인지 */
+  autopilot: boolean;
+  /** 통과한 웨이포인트 수 — waypoints[0..reachedCount)는 도달 완료 */
+  reachedCount: number;
   setRudderCmd: (deg: number) => void;
   setThrottle: (pct: number) => void;
   setMqttStatus: (s: MqttStatus) => void;
   setWaterPolygons: (polygons: WaterPolygon[]) => void;
   setLastCommand: (text: string) => void;
+  addWaypoint: (p: LocalPoint) => void;
+  undoWaypoint: () => void;
+  clearWaypoints: () => void;
+  setAutopilot: (on: boolean) => void;
+}
+
+/** 자동 항해 진행 인덱스 — 60Hz로 갱신되므로 스토어 밖에 둔다. 재계획 때 0으로 리셋. */
+let routeProgress = 0;
+
+/** 경로 계획용 항행 판정 — 충돌 샘플(선체 절반)만큼 여유를 두어
+ * 계획한 경로를 따라가다 물가 충돌 판정에 걸리지 않게 한다. */
+const PLAN_CLEARANCE_M = 8;
+const PLAN_OFFSETS: [number, number][] = [
+  [0, 0],
+  [PLAN_CLEARANCE_M, 0],
+  [-PLAN_CLEARANCE_M, 0],
+  [0, PLAN_CLEARANCE_M],
+  [0, -PLAN_CLEARANCE_M],
+];
+
+function isNavigableForRoute(x: number, z: number): boolean {
+  const { waterPolygons } = useSimStore.getState();
+  // 절차적 바다 모드(수역 데이터 없음) — 어디든 항행 가능
+  if (!getCurrentWaterMask() && waterPolygons.length === 0) return true;
+  return PLAN_OFFSETS.every(([dx, dz]) =>
+    isPointInNavigableWater(x + dx, z + dz, waterPolygons),
+  );
+}
+
+/** 현재 위치에서 남은 웨이포인트를 지나는 항로 재계획. 남은 게 없으면 null. */
+function replanRoute(
+  usv: UsvState,
+  waypoints: LocalPoint[],
+  reachedCount: number,
+): PlannedRoute | null {
+  const remaining = waypoints.slice(reachedCount);
+  if (remaining.length === 0) return null;
+  routeProgress = 0;
+  return planRoute({ x: usv.x, z: usv.z }, remaining, isNavigableForRoute);
 }
 
 export const useSimStore = create<SimStore>((set) => ({
@@ -37,6 +86,10 @@ export const useSimStore = create<SimStore>((set) => ({
   mqttStatus: "disconnected",
   waterPolygons: [],
   lastCommand: null,
+  waypoints: [],
+  route: null,
+  autopilot: false,
+  reachedCount: 0,
   setRudderCmd: (deg) =>
     set((st) => ({ usv: { ...st.usv, rudderCmd: clampRudder(deg) } })),
   setThrottle: (pct) =>
@@ -44,6 +97,32 @@ export const useSimStore = create<SimStore>((set) => ({
   setMqttStatus: (mqttStatus) => set({ mqttStatus }),
   setWaterPolygons: (waterPolygons) => set({ waterPolygons }),
   setLastCommand: (lastCommand) => set({ lastCommand }),
+  addWaypoint: (p) =>
+    set((st) => {
+      if (!isNavigableForRoute(p.x, p.z)) return {}; // 물 밖 클릭은 무시
+      const waypoints = [...st.waypoints, p];
+      const route = replanRoute(st.usv, waypoints, st.reachedCount);
+      // 웨이포인트를 찍으면 곧바로 자동 항해 시작
+      return { waypoints, route, autopilot: route != null };
+    }),
+  undoWaypoint: () =>
+    set((st) => {
+      if (st.waypoints.length <= st.reachedCount) return {};
+      const waypoints = st.waypoints.slice(0, -1);
+      const route = replanRoute(st.usv, waypoints, st.reachedCount);
+      return { waypoints, route, autopilot: st.autopilot && route != null };
+    }),
+  clearWaypoints: () => {
+    routeProgress = 0;
+    set({ waypoints: [], route: null, autopilot: false, reachedCount: 0 });
+  },
+  setAutopilot: (on) =>
+    set((st) => {
+      if (!on) return { autopilot: false };
+      const route = replanRoute(st.usv, st.waypoints, st.reachedCount);
+      if (!route) return {};
+      return { autopilot: true, route };
+    }),
 }));
 
 const TICK_MS = 16; // ~60Hz — 조작 반응과 움직임을 매끄럽게
@@ -146,9 +225,41 @@ export function startSimLoop(): () => void {
     const now = performance.now();
     const dt = Math.min((now - last) / 1000, 0.5); // 탭 복귀 등 큰 공백은 잘라냄
     last = now;
-    const { usv, waterPolygons } = useSimStore.getState();
+    const { usv, waterPolygons, autopilot, route, waypoints, reachedCount } =
+      useSimStore.getState();
     // 눌린 키를 dt 기반으로 반영 (연속 조타/스로틀 + 타 자동 중앙 복원)
-    const { rudderCmd, throttle } = applyKeyboardControls(usv, dt);
+    let { rudderCmd, throttle } = applyKeyboardControls(usv, dt);
+
+    // 자동 항해 — 계획 경로를 추종. 수동 키 입력이 들어오면 즉시 해제.
+    const navUpdates: Partial<
+      Pick<SimStore, "autopilot" | "route" | "reachedCount">
+    > = {};
+    if (autopilot && route) {
+      const manual =
+        controls.left || controls.right || controls.throttleUp || controls.throttleDown;
+      if (manual) {
+        navUpdates.autopilot = false;
+      } else {
+        const out = followRoute(usv, route.points, routeProgress);
+        routeProgress = out.progress;
+        rudderCmd = out.rudderCmd;
+        throttle = out.throttle;
+        // 통과한 웨이포인트 수 갱신 (route는 미도달 웨이포인트만 담고 있다)
+        const base = waypoints.length - route.wpIndex.length;
+        let passed = 0;
+        while (passed < route.wpIndex.length && routeProgress >= route.wpIndex[passed]) {
+          passed += 1;
+        }
+        if (out.arrived) {
+          navUpdates.autopilot = false;
+          navUpdates.route = null;
+          navUpdates.reachedCount = waypoints.length;
+        } else if (base + passed > reachedCount) {
+          navUpdates.reachedCount = base + passed;
+        }
+      }
+    }
+
     const next = { ...usv, rudderCmd, throttle };
     stepUsv(next, dt);
     // 실제 수역 경계(OSM)를 진실로 삼는다 — 그 안이면 DEM이 물을 육지로 잘못 잡아도 항행 가능.
@@ -165,7 +276,7 @@ export function startSimLoop(): () => void {
       next.z = usv.z;
       next.speed = 0;
     }
-    useSimStore.setState({ usv: next });
+    useSimStore.setState({ usv: next, ...navUpdates });
 
     const n = trail.length;
     const moved =

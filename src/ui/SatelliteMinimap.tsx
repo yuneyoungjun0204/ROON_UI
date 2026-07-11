@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Play, Square, Trash2, Undo2 } from "lucide-react";
 import { config } from "../config";
-import { localMetersToLonLat } from "../geo/webMercator";
+import { localMetersToLonLat, lonLatToLocalMeters } from "../geo/webMercator";
 import { trail, useSimStore } from "../store";
 
 const CSS_SIZE = 285;
@@ -19,6 +19,15 @@ function project(lon: number, lat: number, zoom: number) {
       ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
       scale,
   };
+}
+
+/** project()의 역변환 — 웹 메르카토르 픽셀 좌표 → 위경도 */
+function unproject(x: number, y: number, zoom: number) {
+  const scale = TILE_SIZE * 2 ** zoom;
+  const lon = (x / scale) * 360 - 180;
+  const n = Math.PI * (1 - (2 * y) / scale);
+  const lat = (Math.atan(Math.sinh(n)) * 180) / Math.PI;
+  return { lon, lat };
 }
 
 function metersPerPixel(lat: number, zoom: number) {
@@ -80,6 +89,25 @@ function pickScaleBar(metersPerPx: number) {
 export function Minimap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
+  const waypoints = useSimStore((s) => s.waypoints);
+  const reachedCount = useSimStore((s) => s.reachedCount);
+  const autopilot = useSimStore((s) => s.autopilot);
+  const addWaypoint = useSimStore((s) => s.addWaypoint);
+  const undoWaypoint = useSimStore((s) => s.undoWaypoint);
+  const clearWaypoints = useSimStore((s) => s.clearWaypoints);
+  const setAutopilot = useSimStore((s) => s.setAutopilot);
+  const remaining = waypoints.length - reachedCount;
+
+  /** 캔버스 클릭 위치 → 씬 로컬 미터 좌표 */
+  const clickToLocal = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - rect.left - CSS_SIZE / 2;
+    const dy = e.clientY - rect.top - CSS_SIZE / 2;
+    const { usv } = useSimStore.getState();
+    const center = project(usv.lon, usv.lat, ZOOMS[zoomIdx]);
+    const { lon, lat } = unproject(center.x + dx, center.y + dy, ZOOMS[zoomIdx]);
+    return lonLatToLocalMeters(lon, lat, config.initialLon, config.initialLat);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -119,27 +147,60 @@ export function Minimap() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, W, W);
 
+      // 씬 로컬 미터 → 미니맵 캔버스 픽셀
+      const toCanvas = (x: number, z: number) => {
+        const point = localMetersToLonLat(x, z, config.initialLon, config.initialLat);
+        const projected = project(point.lon, point.lat, zoom);
+        return { px: half + (projected.x - center.x), py: half + (projected.y - center.y) };
+      };
+
       if (trail.length >= 4) {
         ctx.strokeStyle = "rgba(116, 217, 255, 0.92)";
         ctx.lineWidth = 2;
         ctx.lineJoin = "round";
         ctx.beginPath();
         for (let i = 0; i < trail.length; i += 2) {
-          const point = localMetersToLonLat(
-            trail[i],
-            trail[i + 1],
-            config.initialLon,
-            config.initialLat,
-          );
-          const projected = project(point.lon, point.lat, zoom);
-          const px = half + (projected.x - center.x);
-          const py = half + (projected.y - center.y);
+          const { px, py } = toCanvas(trail[i], trail[i + 1]);
           if (i === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
         ctx.lineTo(half, half);
         ctx.stroke();
       }
+
+      // 계획 항로 (점선) + 웨이포인트
+      const { route, waypoints, reachedCount } = useSimStore.getState();
+      if (route && route.points.length >= 2) {
+        ctx.strokeStyle = "rgba(255, 190, 92, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        route.points.forEach((p, i) => {
+          const { px, py } = toCanvas(p.x, p.z);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      waypoints.forEach((p, i) => {
+        const { px, py } = toCanvas(p.x, p.z);
+        const reached = i < reachedCount;
+        ctx.beginPath();
+        ctx.arc(px, py, 7.5, 0, Math.PI * 2);
+        ctx.fillStyle = reached ? "rgba(140, 155, 168, 0.75)" : "rgba(255, 170, 60, 0.95)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = "#0b1520";
+        ctx.font = "700 9px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), px, py + 0.5);
+        ctx.textBaseline = "alphabetic";
+      });
 
       ctx.save();
       ctx.translate(half, half);
@@ -206,7 +267,34 @@ export function Minimap() {
       <canvas
         ref={canvasRef}
         style={{ width: CSS_SIZE, height: CSS_SIZE, borderRadius: 8, display: "block" }}
+        onClick={(e) => addWaypoint(clickToLocal(e))}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          undoWaypoint();
+        }}
+        title="클릭: 웨이포인트 추가 · 우클릭: 마지막 취소"
       />
+      <div className="minimap-actions">
+        <button
+          className={autopilot ? "active" : ""}
+          onClick={() => setAutopilot(!autopilot)}
+          disabled={!autopilot && remaining === 0}
+        >
+          {autopilot ? <Square size={12} /> : <Play size={12} />}
+          {autopilot ? "정지" : "출발"}
+        </button>
+        <button onClick={undoWaypoint} disabled={remaining === 0} aria-label="마지막 웨이포인트 취소">
+          <Undo2 size={12} />
+        </button>
+        <button onClick={clearWaypoints} disabled={waypoints.length === 0} aria-label="경로 지우기">
+          <Trash2 size={12} />
+        </button>
+        <span className="hint">
+          {waypoints.length === 0
+            ? "지도를 클릭해 웨이포인트"
+            : `WP ${Math.min(reachedCount + 1, waypoints.length)}/${waypoints.length}${autopilot ? " 항해 중" : ""}`}
+        </span>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Usv } from "./Usv";
 import { Wake } from "./Wake";
 import { GeoMapSurface } from "./GeoMapSurface";
 import { WaterMask } from "./WaterMask";
+import { RouteLine } from "./RouteLine";
 import { useSimStore } from "../store";
 import { waveHeight, lakeWaveHeight, WATER_LEVEL_Y } from "../sim/waves";
 import { makeSkyMaterial, SKY_PALETTE } from "./skyGlsl";
@@ -125,6 +126,7 @@ export function Scene() {
         <Ocean sunDir={SUN_DIR} />
       )}
       {!config.vworldKey && <Wake />}
+      <RouteLine />
       <Usv />
       <FollowCamera />
     </Canvas>
