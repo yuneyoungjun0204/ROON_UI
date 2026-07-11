@@ -12,6 +12,8 @@ export const controls = {
   /** 키보드로 조향 중인지 — 키를 떼면 조향을 자동으로 중앙 복원할지 판단하는 게이트.
    *  슬라이더/원격(MQTT) 조향에는 개입하지 않게 하려고 키 입력일 때만 켠다. */
   steering: false,
+  /** R키 홀드 중인지 — 1초 후 게이지 시작, 총 2초 유지 시 전체 초기화(견인) */
+  resetHeld: false,
 };
 
 const STEER_RATE = 140; // %/s — 키를 누르는 동안 조향 지령 증가율 (풀조향까지 약 0.7s)
@@ -55,4 +57,5 @@ export function resetControls(): void {
   controls.right = false;
   controls.throttleUp = false;
   controls.throttleDown = false;
+  controls.resetHeld = false;
 }

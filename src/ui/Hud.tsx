@@ -13,6 +13,12 @@ import {
   Anchor,
   Bot,
   Gamepad2,
+  Zap,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  OctagonX,
+  RotateCcw,
 } from "lucide-react";
 import { useSimStore } from "../store";
 import { config, STATION_ZONE_RADIUS_M } from "../config";
@@ -30,6 +36,57 @@ function StatusBadge() {
     <div className={`badge badge-${status}`}>
       <Icon size={14} className={status === "connecting" ? "spin" : undefined} />
       <span>{label}</span>
+    </div>
+  );
+}
+
+/** 화면 중앙 오버레이 — R키 홀드 초기화 게이지, 배터리 방전 견인 안내 */
+function CenterOverlay() {
+  const resetProgress = useSimStore((s) => s.resetProgress);
+  const battery = useSimStore((s) => s.battery);
+
+  if (resetProgress > 0) {
+    return (
+      <div className="panel center-overlay">
+        <div className="overlay-title">
+          <RotateCcw size={15} />
+          <span>초기화 중…</span>
+        </div>
+        <div className="reset-gauge">
+          <div className="reset-gauge-fill" style={{ width: `${Math.min(100, resetProgress * 100)}%` }} />
+        </div>
+        <span className="overlay-sub">{Math.floor(Math.min(100, resetProgress * 100))}% — R키를 계속 누르고 계세요</span>
+      </div>
+    );
+  }
+  if (battery <= 0) {
+    return (
+      <div className="panel center-overlay overlay-danger">
+        <div className="overlay-title">
+          <BatteryLow size={16} />
+          <span>배터리 방전 — 조작 불능</span>
+        </div>
+        <span className="overlay-sub">R키를 2초 동안 눌러 견인하세요.</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+/** 배터리 표시 — 잔량 바 + %. 50% 초과 초록 / 15~50% 노랑 / 15% 이하 빨강, 충전 중이면 ⚡ */
+function BatteryStatus() {
+  const battery = useSimStore((s) => s.battery);
+  const charging = useSimStore((s) => s.charging);
+  const level = battery > 50 ? "high" : battery > 15 ? "mid" : "low";
+  const Icon = charging ? Zap : battery > 50 ? BatteryFull : battery > 15 ? BatteryMedium : BatteryLow;
+  return (
+    <div className={`battery battery-${level}`}>
+      <Icon size={15} className={charging ? "battery-charge-icon" : undefined} />
+      <div className="battery-shell">
+        <div className="battery-fill" style={{ width: `${battery}%` }} />
+      </div>
+      <span className="battery-pct">{battery.toFixed(0)}%</span>
+      {charging && <span className="battery-charging-label">충전 중</span>}
     </div>
   );
 }
@@ -63,6 +120,7 @@ export function Hud() {
   const setSteer = useSimStore((s) => s.setSteer);
   const setThrottle = useSimStore((s) => s.setThrottle);
   const returnToStation = useSimStore((s) => s.returnToStation);
+  const emergencyStop = useSimStore((s) => s.emergencyStop);
   const autopilot = useSimStore((s) => s.autopilot);
   const returningToStation = useSimStore((s) => s.returningToStation);
 
@@ -74,7 +132,10 @@ export function Hud() {
       else if (key === "d" || e.key === "ArrowRight") controls.right = down;
       else if (key === "w" || e.key === "ArrowUp") controls.throttleUp = down;
       else if (key === "s" || e.key === "ArrowDown") controls.throttleDown = down;
-      else if (e.key === " ") {
+      else if (key === "r") {
+        // R 홀드 = 전체 초기화 (1초 후 게이지 시작, 1초 만에 완충)
+        controls.resetHeld = down;
+      } else if (e.key === " ") {
         // Space = 스로틀 0 (정지 지령)
         if (down) useSimStore.getState().setThrottle(0);
       } else return;
@@ -163,6 +224,7 @@ export function Hud() {
       </div>
 
       <div className="panel top-right">
+        <BatteryStatus />
         <StatusBadge />
         <div className="topic">{`devices/${config.deviceToken}/telemetry`}</div>
         {lastCommand && (
@@ -174,16 +236,26 @@ export function Hud() {
       </div>
 
       <div className="panel controls">
-        <button
-          className="station-btn"
-          onClick={returnToStation}
-          disabled={inStationZone}
-          title={inStationZone ? "이미 스테이션 존 안에 있습니다" : undefined}
-        >
-          <Anchor size={13} />
-          {inStationZone ? "스테이션 존 내 위치" : "스테이션 복귀"}
-          {autopilot && !inStationZone && <span className="station-btn-note">자동 항해 중</span>}
-        </button>
+        <div className="controls-top">
+          <button
+            className="station-btn"
+            onClick={returnToStation}
+            disabled={inStationZone}
+            title={inStationZone ? "이미 스테이션 존 안에 있습니다" : undefined}
+          >
+            <Anchor size={13} />
+            {inStationZone ? "스테이션 존 내 위치" : "스테이션 복귀"}
+            {autopilot && !inStationZone && <span className="station-btn-note">자동 항해 중</span>}
+          </button>
+          <button
+            className="estop-btn"
+            onClick={emergencyStop}
+            title="쓰러스터 즉시 차단 · 자율 운항/스테이션 복귀 취소"
+          >
+            <OctagonX size={13} />
+            비상정지
+          </button>
+        </div>
         <div className="control">
           <div className="control-head">
             <span className="label">STEER</span>
@@ -248,6 +320,8 @@ export function Hud() {
           <span className="hint">좌/우 차동 추진 · 후미 장착</span>
         </div>
       </div>
+
+      <CenterOverlay />
 
       <Minimap />
     </div>

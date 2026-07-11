@@ -128,6 +128,68 @@ body {
   align-items: flex-end;
 }
 
+/* ---------- 배터리 ---------- */
+
+.battery {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.battery-shell {
+  position: relative;
+  width: 84px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.battery-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  transition: width 0.2s linear, background 0.3s ease;
+}
+
+.battery-pct {
+  min-width: 38px;
+  text-align: right;
+}
+
+.battery-high svg { color: #4cd964; }
+.battery-high .battery-pct { color: #9beeae; }
+.battery-high .battery-fill { background: linear-gradient(90deg, #2fa84c, #4cd964); }
+
+.battery-mid svg { color: #ffd447; }
+.battery-mid .battery-pct { color: #ffe28a; }
+.battery-mid .battery-fill { background: linear-gradient(90deg, #d9a613, #ffd447); }
+
+.battery-low svg { color: #ff5252; }
+.battery-low .battery-pct { color: #ff9d9d; }
+.battery-low .battery-fill { background: linear-gradient(90deg, #c62828, #ff5252); }
+
+.battery-low .battery-shell {
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+
+.battery-charge-icon {
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+
+.battery-charging-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #9beeae;
+}
+
 .badge {
   display: inline-flex;
   gap: 6px;
@@ -198,12 +260,18 @@ body {
   padding: 12px 22px 13px;
 }
 
+.controls-top {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
 .station-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  width: 100%;
+  flex: 1;
   padding: 7px 0;
   font-size: 12px;
   font-weight: 650;
@@ -231,6 +299,89 @@ body {
   font-weight: 600;
   color: #9ec7e8;
   letter-spacing: 0.06em;
+}
+
+.estop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffb3ad;
+  background: rgba(255, 82, 82, 0.14);
+  border: 1px solid rgba(255, 82, 82, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.estop-btn:hover {
+  background: rgba(255, 82, 82, 0.26);
+  border-color: rgba(255, 82, 82, 0.7);
+}
+
+/* ---------- 중앙 오버레이 (초기화 게이지 · 견인 안내) ---------- */
+
+.center-overlay {
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 26px;
+  min-width: 300px;
+}
+
+.overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.overlay-title svg {
+  color: #ffb84d;
+}
+
+.overlay-sub {
+  font-size: 12px;
+  color: #b8ccdb;
+}
+
+.reset-gauge {
+  width: 260px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.reset-gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d98c1f, #ffb84d);
+  border-radius: 4px;
+}
+
+.center-overlay.overlay-danger {
+  border-color: rgba(255, 82, 82, 0.5);
+  animation: live-blink 1.6s ease-in-out infinite;
+}
+
+.overlay-danger .overlay-title,
+.overlay-danger .overlay-title svg {
+  color: #ff7a7a;
+}
+
+.overlay-danger .overlay-sub {
+  color: #ffc4c0;
+  font-weight: 600;
 }
 
 .control {

@@ -62,7 +62,7 @@ export function useMqtt(): void {
     // 텔레메트리 주기 발행 (연결 안 되어 있으면 건너뜀)
     const timer = setInterval(() => {
       if (!client.connected) return;
-      const { usv } = useSimStore.getState();
+      const { usv, battery } = useSimStore.getState();
       const readings: Record<string, number> = {
         lat: usv.lat,
         lon: usv.lon,
@@ -70,6 +70,7 @@ export function useMqtt(): void {
         sog: usv.speed * MS_TO_KN,
         thrust_port: usv.thrustPort,
         thrust_stbd: usv.thrustStbd,
+        battery,
       };
       const ts = Math.floor(Date.now() / 1000);
       for (const [sensor, value] of Object.entries(readings)) {

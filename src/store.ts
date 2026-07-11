@@ -11,7 +11,7 @@ import {
   clampThrottle,
   type UsvState,
 } from "./sim/usvSim";
-import { applyKeyboardControls, controls } from "./sim/controls";
+import { applyKeyboardControls, controls, resetControls } from "./sim/controls";
 import { isPointInWater, type WaterPolygon } from "./geo/waterArea";
 import { getCurrentWaterMask } from "./scene/waterMaskTexture";
 import { localMetersToLonLat, type LocalPoint } from "./geo/webMercator";
@@ -35,6 +35,12 @@ interface SimStore {
   autopilot: boolean;
   /** 자동 항해가 스테이션 복귀인지 (상태 표시용) */
   returningToStation: boolean;
+  /** 배터리 잔량 (%) */
+  battery: number;
+  /** 스테이션에서 충전 중인지 */
+  charging: boolean;
+  /** R키 홀드 초기화 진행률 (0 = 안 누름, 0~1 = 게이지) */
+  resetProgress: number;
   /** 통과한 웨이포인트 수 — waypoints[0..reachedCount)는 도달 완료 */
   reachedCount: number;
   setSteer: (pct: number) => void;
@@ -48,6 +54,12 @@ interface SimStore {
   setAutopilot: (on: boolean) => void;
   /** 스테이션 존(시작 위치)으로 자동 복귀 — 기존 웨이포인트는 버린다 */
   returnToStation: () => void;
+  /** 배터리 잔량 직접 설정 (디버그/원격 명령용) */
+  setBattery: (pct: number) => void;
+  /** 비상정지 — 모든 쓰러스터 지령·출력을 0으로, 예정된 자동 항해 전부 취소 */
+  emergencyStop: () => void;
+  /** 전체 초기화 — 초기 위치·초기 상태(배터리 90%)로 되돌린다 */
+  resetSimulation: () => void;
 }
 
 /** 자동 항해 추종 상태 — 60Hz로 갱신되므로 스토어 밖에 둔다. 재계획 때 리셋. */
@@ -64,6 +76,23 @@ let offPathReplanCount = 0; // 디버그 관측용
  * 수동 조작으로 전환한다. 이 단계 동안에는 자동 항해 상태가 유지된다. */
 let stoppingAfterArrival = false;
 const STOP_SPEED_MS = 0.15; // 이 속도 이하면 정지 완료로 간주
+
+// ---- 배터리 ----
+const BATTERY_START_PCT = 90;
+const BATTERY_DRAIN_BASE = 0.05; // %/s — 존 밖에 있는 동안의 기본 소모 (항법·센서)
+const BATTERY_DRAIN_THRUST = 0.3; // %/s — 풀추력 시 추가 소모 (좌우 평균 사용률 비례)
+const BATTERY_CHARGE_RATE = 2.5; // %/s — 스테이션 존 내 급속 충전
+const AUTO_RETURN_BATTERY_PCT = 10; // 이하로 떨어지면 자동 스테이션 복귀
+
+/** 존을 한 번이라도 나갔는지 — 충전은 "복귀한 후"에만 (시작 시 90% 유지) */
+let hasLeftStationZone = false;
+/** 저전력 자동 복귀를 이미 발동했는지 — 수동 개입 시 재발동 방지, 충전되면 재무장 */
+let lowBatteryReturnTriggered = false;
+
+// ---- R키 홀드 초기화 (견인) ----
+const RESET_DELAY_MS = 1000; // 이만큼 누르고 있어야 게이지(입력)가 시작된다 — 오입력 방지
+const RESET_GAUGE_MS = 1000; // 게이지가 다 차는 시간 (총 홀드 = DELAY + GAUGE)
+let resetHoldStart: number | null = null; // 홀드 시작 시각 (performance.now)
 
 // 개발 편의: 콘솔에서 내부 항법 상태를 들여다볼 수 있게 노출
 if (import.meta.env.DEV && typeof window !== "undefined") {
@@ -119,6 +148,9 @@ export const useSimStore = create<SimStore>((set) => ({
   route: null,
   autopilot: false,
   returningToStation: false,
+  battery: BATTERY_START_PCT,
+  charging: false,
+  resetProgress: 0,
   reachedCount: 0,
   setSteer: (pct) =>
     set((st) => ({ usv: { ...st.usv, steer: clampSteer(pct) } })),
@@ -178,6 +210,44 @@ export const useSimStore = create<SimStore>((set) => ({
         returningToStation: route != null,
       };
     }),
+  setBattery: (pct) =>
+    set(() => ({ battery: Math.min(100, Math.max(0, pct)) })),
+  emergencyStop: () => {
+    followState = createFollowState();
+    stoppingAfterArrival = false;
+    set((st) => ({
+      // 쓰러스터 지령·실제 출력 즉시 차단 (배는 관성으로만 미끄러진다)
+      usv: { ...st.usv, throttle: 0, steer: 0, thrustPort: 0, thrustStbd: 0 },
+      // 예정된 자동 항해(자율 운항·스테이션 복귀) 전부 취소
+      waypoints: [],
+      route: null,
+      autopilot: false,
+      returningToStation: false,
+      reachedCount: 0,
+      lastCommand: "비상정지 — 쓰러스터 차단·자동 항해 취소",
+    }));
+  },
+  resetSimulation: () => {
+    followState = createFollowState();
+    stoppingAfterArrival = false;
+    hasLeftStationZone = false;
+    lowBatteryReturnTriggered = false;
+    resetHoldStart = null;
+    trail.length = 0;
+    resetControls();
+    set({
+      usv: createUsvState(config.initialLat, config.initialLon),
+      waypoints: [],
+      route: null,
+      autopilot: false,
+      returningToStation: false,
+      battery: BATTERY_START_PCT,
+      charging: false,
+      resetProgress: 0,
+      reachedCount: 0,
+      lastCommand: "초기화 완료 — 초기 위치로 견인",
+    });
+  },
 }));
 
 const TICK_MS = 16; // ~60Hz — 조작 반응과 움직임을 매끄럽게
@@ -280,7 +350,42 @@ export function startSimLoop(): () => void {
     const now = performance.now();
     const dt = Math.min((now - last) / 1000, 0.5); // 탭 복귀 등 큰 공백은 잘라냄
     last = now;
-    const { usv, waterPolygons, autopilot, route, waypoints, reachedCount } =
+    // R키 홀드 초기화 — 1초 이상 누르고 있으면 게이지가 시작되고, 1초 만에 다 차면
+    // 전체 초기화(견인). 짧게 스치는 입력은 게이지조차 뜨지 않는다.
+    {
+      const st = useSimStore.getState();
+      if (controls.resetHeld) {
+        if (resetHoldStart == null) resetHoldStart = now;
+        const progress = (now - resetHoldStart - RESET_DELAY_MS) / RESET_GAUGE_MS;
+        if (progress >= 1) {
+          st.resetSimulation();
+          return; // 이 틱은 여기서 종료 — 다음 틱부터 초기 상태로 진행
+        }
+        const clamped = Math.max(0, progress);
+        if (clamped !== st.resetProgress) useSimStore.setState({ resetProgress: clamped });
+      } else if (resetHoldStart != null) {
+        // 도중에 손을 뗌 — 게이지 취소
+        resetHoldStart = null;
+        useSimStore.setState({ resetProgress: 0 });
+      }
+    }
+
+    // 저전력 자동 복귀 — 존 밖에서 배터리가 임계 이하로 떨어지면 한 번 발동.
+    // (수동 개입으로 취소해도 재발동하지 않으며, 임계 위로 충전되면 다시 무장된다)
+    {
+      const pre = useSimStore.getState();
+      if (
+        !lowBatteryReturnTriggered &&
+        pre.battery <= AUTO_RETURN_BATTERY_PCT &&
+        Math.hypot(pre.usv.x, pre.usv.z) > STATION_ZONE_RADIUS_M
+      ) {
+        lowBatteryReturnTriggered = true;
+        pre.returnToStation();
+        pre.setLastCommand(`배터리 ${AUTO_RETURN_BATTERY_PCT}% — 스테이션 자동 복귀`);
+      }
+    }
+
+    const { usv, waterPolygons, autopilot, route, waypoints, reachedCount, battery } =
       useSimStore.getState();
     // 눌린 키를 dt 기반으로 반영 (연속 조향/스로틀 + 조향 자동 중앙 복원)
     let { steer, throttle } = applyKeyboardControls(usv, dt);
@@ -349,10 +454,40 @@ export function startSimLoop(): () => void {
       }
     }
 
+    // 배터리 방전 — 추진 불가. 지령을 0으로 눌러 표류 상태로 만든다.
+    if (battery <= 0) {
+      steer = 0;
+      throttle = 0;
+      if (autopilot) {
+        navUpdates.autopilot = false;
+        navUpdates.returningToStation = false;
+      }
+    }
+
     const next = { ...usv, steer, throttle };
     stepUsv(next, dt);
     // 정지 단계의 역추진이 후진으로 이어지지 않게 — 멈추는 게 목적이다
     if (brakingThisTick && next.speed < 0) next.speed = 0;
+
+    // 배터리 소모/충전 — 존 밖이면 사용량 비례 소모, 복귀 후 존 안이면 급속 충전
+    const insideStationZone = Math.hypot(next.x, next.z) <= STATION_ZONE_RADIUS_M;
+    let nextBattery = battery;
+    let charging = false;
+    if (!insideStationZone) {
+      hasLeftStationZone = true;
+      const thrustUse = (Math.abs(next.thrustPort) + Math.abs(next.thrustStbd)) / 200; // 0~1
+      nextBattery = Math.max(
+        0,
+        battery - (BATTERY_DRAIN_BASE + BATTERY_DRAIN_THRUST * thrustUse) * dt,
+      );
+    } else if (hasLeftStationZone && battery < 100) {
+      nextBattery = Math.min(100, battery + BATTERY_CHARGE_RATE * dt);
+      charging = true;
+    }
+    // 임계 위로 충전되면 저전력 자동 복귀 재무장
+    if (lowBatteryReturnTriggered && nextBattery > AUTO_RETURN_BATTERY_PCT + 10) {
+      lowBatteryReturnTriggered = false;
+    }
     // 실제 수역 경계(OSM)를 진실로 삼는다 — 그 안이면 DEM이 물을 육지로 잘못 잡아도 항행 가능.
     // 폴리곤이 아직 없으면(로드 전/실패) DEM 높이로 폴백.
     const blocked =
@@ -367,7 +502,7 @@ export function startSimLoop(): () => void {
       next.z = usv.z;
       next.speed = 0;
     }
-    useSimStore.setState({ usv: next, ...navUpdates });
+    useSimStore.setState({ usv: next, battery: nextBattery, charging, ...navUpdates });
 
     const n = trail.length;
     const moved =
