@@ -49,6 +49,8 @@ interface SimStore {
   setWaterPolygons: (polygons: WaterPolygon[]) => void;
   setLastCommand: (text: string) => void;
   addWaypoint: (p: LocalPoint) => void;
+  /** 기존 웨이포인트를 새 위치로 이동 (플래너에서 핀 드래그) */
+  moveWaypoint: (index: number, p: LocalPoint) => void;
   undoWaypoint: () => void;
   clearWaypoints: () => void;
   setAutopilot: (on: boolean) => void;
@@ -167,6 +169,15 @@ export const useSimStore = create<SimStore>((set) => ({
       const route = replanRoute(st.usv, waypoints, st.reachedCount);
       // 웨이포인트를 찍으면 곧바로 자동 항해 시작 (일반 항해 모드)
       return { waypoints, route, autopilot: route != null, returningToStation: false };
+    }),
+  moveWaypoint: (index, p) =>
+    set((st) => {
+      if (index < 0 || index >= st.waypoints.length) return {};
+      if (!isNavigableForRoute(p.x, p.z)) return {}; // 물 밖으로는 못 옮긴다
+      const waypoints = st.waypoints.slice();
+      waypoints[index] = p;
+      const route = replanRoute(st.usv, waypoints, st.reachedCount);
+      return { waypoints, route, autopilot: st.autopilot && route != null };
     }),
   undoWaypoint: () =>
     set((st) => {

@@ -1,10 +1,9 @@
-// HUD — 항법 정보 표시와 타각/스로틀 수동 조작.
-// 키보드: ←/→ 타각, ↑/↓ 스로틀, Space 타 중앙.
+// HUD — 항법 정보 표시와 조작 콘솔.
+// 키보드: ←/→(A/D) 조향, ↑/↓(W/S) 스로틀, Space 스로틀 0, R 홀드 초기화.
+// 하단 콘솔: 나침반 · 속도계 · 배터리 · 추력 | 웨이포인트 · 스테이션 복귀 · 비상정지.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  Navigation,
-  Gauge,
   Wifi,
   WifiOff,
   Loader2,
@@ -13,19 +12,18 @@ import {
   Anchor,
   Bot,
   Gamepad2,
-  Zap,
-  BatteryFull,
-  BatteryMedium,
-  BatteryLow,
   OctagonX,
   RotateCcw,
+  BatteryLow,
+  MapPin,
+  Cctv,
 } from "lucide-react";
 import { useSimStore } from "../store";
 import { config, STATION_ZONE_RADIUS_M } from "../config";
 import { controls, resetControls } from "../sim/controls";
 import { Minimap } from "./SatelliteMinimap";
-
-const MS_TO_KN = 1.943844;
+import { WaypointPlanner } from "./WaypointPlanner";
+import { CompassGauge, SpeedGauge, BatteryGauge, ThrustBars } from "./gauges";
 
 function StatusBadge() {
   const status = useSimStore((s) => s.mqttStatus);
@@ -40,7 +38,7 @@ function StatusBadge() {
   );
 }
 
-/** 운항 모드 표시 내용 — 상단 배지와 컨트롤 패널 상태줄이 공유 */
+/** 운항 모드 표시 내용 — 플로팅 상태 배지가 사용 */
 function ModeIndicator({ prefix }: { prefix?: string }) {
   const autopilot = useSimStore((s) => s.autopilot);
   const returning = useSimStore((s) => s.returningToStation);
@@ -95,52 +93,13 @@ function CenterOverlay() {
   return null;
 }
 
-/** 배터리 표시 — 잔량 바 + %. 50% 초과 초록 / 15~50% 노랑 / 15% 이하 빨강, 충전 중이면 ⚡ */
-function BatteryStatus() {
-  const battery = useSimStore((s) => s.battery);
-  const charging = useSimStore((s) => s.charging);
-  const level = battery > 50 ? "high" : battery > 15 ? "mid" : "low";
-  const Icon = charging ? Zap : battery > 50 ? BatteryFull : battery > 15 ? BatteryMedium : BatteryLow;
-  return (
-    <div className={`battery battery-${level}`}>
-      <Icon size={15} className={charging ? "battery-charge-icon" : undefined} />
-      <div className="battery-shell">
-        <div className="battery-fill" style={{ width: `${battery}%` }} />
-      </div>
-      <span className="battery-pct">{battery.toFixed(0)}%</span>
-      {charging && <span className="battery-charging-label">충전 중</span>}
-    </div>
-  );
-}
-
-/** 좌/우 쓰러스터 출력 게이지 — 중앙 기준으로 정방향(초록)/역방향(빨강) 채움.
- * 정/역 채움을 별도 요소로 두고, width 대신 transform: scaleX로 그린다 —
- * width를 60Hz로 리페인트하면 반투명(backdrop blur) 패널 안에서 픽셀 잔상이
- * 남을 수 있지만, transform은 GPU 합성만 거치므로 잔상이 생기지 않는다. */
-function ThrusterBar({ label, value }: { label: string; value: number }) {
-  const scale = Math.min(1, Math.abs(value) / 100); // 0~1
-  const forward = value >= 0;
-  return (
-    <div className="thruster-row">
-      <span className="thruster-label">{label}</span>
-      <div className="thruster-bar">
-        <div className="thruster-center" />
-        <div className="thruster-fill fwd" style={{ transform: `scaleX(${forward ? scale : 0})` }} />
-        <div className="thruster-fill rev" style={{ transform: `scaleX(${forward ? 0 : scale})` }} />
-      </div>
-      <span className="thruster-value">{value.toFixed(0)}%</span>
-    </div>
-  );
-}
-
 export function Hud() {
   const usv = useSimStore((s) => s.usv);
   const lastCommand = useSimStore((s) => s.lastCommand);
-  const setSteer = useSimStore((s) => s.setSteer);
-  const setThrottle = useSimStore((s) => s.setThrottle);
   const returnToStation = useSimStore((s) => s.returnToStation);
   const emergencyStop = useSimStore((s) => s.emergencyStop);
   const autopilot = useSimStore((s) => s.autopilot);
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   useEffect(() => {
     // 키를 누르는 "동안" 지령을 램프한다 (실제 반영은 시뮬 루프에서 dt 기반으로).
@@ -171,47 +130,11 @@ export function Hud() {
     };
   }, []);
 
-  const sog = usv.speed * MS_TO_KN;
-  // 침로를 -180°~+180° 범위로 변환 (0=북, 시계방향 양수)
-  const signedHeading = ((usv.heading + 180) % 360) - 180;
   // 스테이션 존(원점 반경) 안이면 복귀 버튼 비활성
   const inStationZone = Math.hypot(usv.x, usv.z) <= STATION_ZONE_RADIUS_M;
 
   return (
     <div className="hud">
-      {/* 운항 모드 상태 — 스테이션 복귀 / 자율 운항 / 수동 조작 */}
-      <div className={`panel mode-status ${autopilot ? "mode-auto" : "mode-manual"}`}>
-        <ModeIndicator />
-      </div>
-
-      <div className="panel readouts">
-        <div className="readout">
-          <Navigation size={15} style={{ transform: `rotate(${usv.heading}deg)` }} />
-          <div>
-            <span className="label">Heading</span>
-            <span className="value">
-              {signedHeading > 0 ? "+" : ""}
-              {signedHeading.toFixed(1)}°
-            </span>
-          </div>
-        </div>
-        <div className="readout">
-          <Gauge size={15} />
-          <div>
-            <span className="label">Speed</span>
-            <span className="value">{sog.toFixed(1)} knot</span>
-          </div>
-        </div>
-        <div className="readout wide">
-          <div>
-            <span className="label">GPS</span>
-            <span className="value small">
-              {usv.lat.toFixed(5)}, {usv.lon.toFixed(5)}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="panel camera-card">
         <div className="camera-head">
           <Video size={13} />
@@ -225,6 +148,19 @@ export function Hud() {
         <div id="fpv-view" className="camera-view" />
       </div>
 
+      {/* 스테이션 존 고정 CCTV — 선박과 무관하게 항상 같은 곳을 비춘다 */}
+      <div className="panel camera-card cctv-card">
+        <div className="camera-head">
+          <Cctv size={13} />
+          <span className="label">스테이션 CCTV</span>
+          <span className="camera-live">
+            <span className="camera-live-dot" />
+            LIVE
+          </span>
+        </div>
+        <div id="cctv-view" className="camera-view cctv-view" />
+      </div>
+
       <div className="panel top-right">
         <StatusBadge />
         <div className="topic">{`devices/${config.deviceToken}/telemetry`}</div>
@@ -236,61 +172,44 @@ export function Hud() {
         )}
       </div>
 
-      <div className="panel controls">
-        <div className="controls-top">
+      {/* 하단 콘솔 — 게이지 + 액션 버튼, 위에 플로팅 상태 배지 */}
+      <div className="bottom-console">
+        <div className={`panel floating-status ${autopilot ? "mode-auto" : "mode-manual"}`}>
+          <ModeIndicator prefix="현재 상태: " />
+        </div>
+        <div className="panel console-card">
+          <CompassGauge />
+          <SpeedGauge />
+          <BatteryGauge />
+          <ThrustBars />
+          <div className="console-divider" />
+          <button className="console-btn" onClick={() => setPlannerOpen(true)}>
+            <MapPin size={22} />
+            <span>웨이포인트</span>
+          </button>
           <button
-            className="station-btn"
+            className="console-btn"
             onClick={returnToStation}
             disabled={inStationZone}
             title={inStationZone ? "이미 스테이션 존 안에 있습니다" : undefined}
           >
-            <Anchor size={13} />
-            {inStationZone ? "스테이션 존 내 위치" : "스테이션 복귀"}
-            {autopilot && !inStationZone && <span className="station-btn-note">자동 항해 중</span>}
+            <Anchor size={22} />
+            <span>{inStationZone ? "존 내 위치" : "스테이션 복귀"}</span>
           </button>
           <button
-            className="estop-btn"
+            className="console-btn estop"
             onClick={emergencyStop}
             title="쓰러스터 즉시 차단 · 자율 운항/스테이션 복귀 취소"
           >
-            <OctagonX size={13} />
-            비상정지
+            <OctagonX size={22} />
+            <span>비상정지</span>
           </button>
-        </div>
-        <div className="control thrusters">
-          <div className="control-head">
-            <span className="label">THRUSTERS</span>
-            <span className="hint">좌/우 차동 추진 · 후미 장착</span>
-          </div>
-          <ThrusterBar label="L" value={usv.thrustPort} />
-          <ThrusterBar label="R" value={usv.thrustStbd} />
-          <div className="control-foot">
-            <button className="center-btn" onClick={() => setSteer(0)}>
-              조향 중앙
-            </button>
-            <button className="center-btn" onClick={() => setThrottle(0)}>
-              스로틀 0 (Space)
-            </button>
-            <span className="hint">←/→ 조향 · ↑/↓ 스로틀</span>
-          </div>
-        </div>
-        <div className="control battery-panel">
-          <div className="control-head">
-            <span className="label">BATTERY</span>
-          </div>
-          <BatteryStatus />
-        </div>
-        <div className="control status-panel">
-          <div className="control-head">
-            <span className="label">STATUS</span>
-          </div>
-          <div className={`status-line ${autopilot ? "mode-auto" : "mode-manual"}`}>
-            <ModeIndicator prefix="현재 상태: " />
-          </div>
         </div>
       </div>
 
       <CenterOverlay />
+
+      {plannerOpen && <WaypointPlanner onClose={() => setPlannerOpen(false)} />}
 
       <Minimap />
     </div>

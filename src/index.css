@@ -67,38 +67,6 @@ body {
   padding: 12px 14px;
 }
 
-.readouts {
-  top: 16px;
-  left: 16px;
-  display: flex;
-  gap: 22px;
-  align-items: center;
-  padding: 12px 18px;
-}
-
-.readout {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-}
-
-.readout svg {
-  color: #6fc3ff;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 6px rgba(111, 195, 255, 0.35));
-}
-
-.readout > div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.readout + .readout {
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
-  padding-left: 22px;
-}
-
 .label {
   font-size: 9.5px;
   font-weight: 600;
@@ -126,68 +94,6 @@ body {
   flex-direction: column;
   gap: 8px;
   align-items: flex-end;
-}
-
-/* ---------- 배터리 ---------- */
-
-.battery {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.battery-shell {
-  position: relative;
-  width: 84px;
-  height: 11px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.battery-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 3px;
-  transition: width 0.2s linear, background 0.3s ease;
-}
-
-.battery-pct {
-  min-width: 38px;
-  text-align: right;
-}
-
-.battery-high svg { color: #4cd964; }
-.battery-high .battery-pct { color: #9beeae; }
-.battery-high .battery-fill { background: linear-gradient(90deg, #2fa84c, #4cd964); }
-
-.battery-mid svg { color: #ffd447; }
-.battery-mid .battery-pct { color: #ffe28a; }
-.battery-mid .battery-fill { background: linear-gradient(90deg, #d9a613, #ffd447); }
-
-.battery-low svg { color: #ff5252; }
-.battery-low .battery-pct { color: #ff9d9d; }
-.battery-low .battery-fill { background: linear-gradient(90deg, #c62828, #ff5252); }
-
-.battery-low .battery-shell {
-  animation: live-blink 1.2s ease-in-out infinite;
-}
-
-.battery-charge-icon {
-  animation: live-blink 1.2s ease-in-out infinite;
-}
-
-.battery-charging-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: #9beeae;
 }
 
 .badge {
@@ -248,79 +154,10 @@ body {
   font-family: "SF Mono", ui-monospace, monospace;
 }
 
-/* ---------- 조작 패널 ---------- */
-
-.controls {
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-wrap: wrap; /* 스테이션 복귀 버튼(width 100%)이 상단 한 줄을 차지 */
-  gap: 12px 30px;
-  padding: 12px 22px 13px;
-}
-
-.controls-top {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.station-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  flex: 1;
-  padding: 7px 0;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  color: #ffd9a0;
-  background: rgba(255, 170, 60, 0.12);
-  border: 1px solid rgba(255, 170, 60, 0.38);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
-
-.station-btn:hover:not(:disabled) {
-  background: rgba(255, 170, 60, 0.22);
-  border-color: rgba(255, 170, 60, 0.6);
-}
-
-.station-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.station-btn-note {
-  font-size: 10px;
-  font-weight: 600;
-  color: #9ec7e8;
-  letter-spacing: 0.06em;
-}
-
-.estop-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #ffb3ad;
-  background: rgba(255, 82, 82, 0.14);
-  border: 1px solid rgba(255, 82, 82, 0.45);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
-
-.estop-btn:hover {
-  background: rgba(255, 82, 82, 0.26);
-  border-color: rgba(255, 82, 82, 0.7);
+.hint {
+  font-size: 10.5px;
+  color: #75899a;
+  letter-spacing: 0.02em;
 }
 
 /* ---------- 중앙 오버레이 (초기화 게이지 · 견인 안내) ---------- */
@@ -384,243 +221,7 @@ body {
   font-weight: 600;
 }
 
-.control {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 230px;
-}
-
-.control-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.control-head .value {
-  font-size: 15px;
-}
-
-.control-head .value .dir {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  margin-right: 3px;
-}
-
-.dir-port {
-  color: #ff7a70;
-}
-
-.dir-stbd {
-  color: #4cd964;
-}
-
-/* 슬라이더 — 중앙(타)·0점(스로틀) 눈금이 있는 커스텀 트랙 */
-.slider-wrap {
-  position: relative;
-  height: 22px;
-  display: flex;
-  align-items: center;
-}
-
-.slider-wrap .tick {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  width: 2px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.28);
-  pointer-events: none;
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 22px;
-  background: transparent;
-  cursor: pointer;
-}
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.16)
-  );
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -5px;
-  border-radius: 50%;
-  background: #6fc3ff;
-  border: 2px solid rgba(6, 14, 22, 0.9);
-  box-shadow: 0 0 8px rgba(111, 195, 255, 0.5);
-  transition: transform 0.12s ease;
-}
-
-input[type="range"]:hover::-webkit-slider-thumb {
-  transform: scale(1.12);
-}
-
-input[type="range"]::-moz-range-track {
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.13);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #6fc3ff;
-  border: 2px solid rgba(6, 14, 22, 0.9);
-}
-
-.control-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 22px;
-}
-
-.center-btn {
-  font-size: 11px;
-  color: #b8ccdb;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 3px 10px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.center-btn:hover {
-  background: rgba(255, 255, 255, 0.13);
-}
-
-.hint {
-  font-size: 10.5px;
-  color: #75899a;
-  letter-spacing: 0.02em;
-}
-
-/* ---------- 좌/우 쓰러스터 게이지 ---------- */
-
-.control.thrusters {
-  width: 320px;
-  gap: 8px;
-}
-
-.control.thrusters .control-foot {
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.control.thrusters .control-foot .hint {
-  margin-left: auto;
-}
-
-/* 컨트롤 패널 내 배터리 열 */
-.control.battery-panel {
-  width: 190px;
-  gap: 10px;
-}
-
-.control.battery-panel .battery {
-  width: 100%;
-}
-
-.control.battery-panel .battery-shell {
-  flex: 1;
-  height: 13px;
-}
-
-.thruster-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.thruster-label {
-  width: 12px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #7f93a4;
-}
-
-.thruster-bar {
-  position: relative;
-  flex: 1;
-  height: 13px;
-  background: rgba(255, 255, 255, 0.07);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.thruster-center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.25);
-}
-
-/* 채움은 반폭 고정 + transform: scaleX — width 리페인트 잔상·트랜지션 노이즈 방지.
- * transform은 GPU 합성만 거치므로 60Hz 갱신에도 픽셀 잔상이 남지 않는다 */
-.thruster-fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  transform: scaleX(0);
-  will-change: transform;
-}
-
-.thruster-fill.fwd {
-  left: 50%;
-  transform-origin: left center;
-  background: linear-gradient(90deg, rgba(76, 217, 100, 0.55), rgba(76, 217, 100, 0.95));
-  border-radius: 0 5px 5px 0;
-}
-
-.thruster-fill.rev {
-  right: 50%;
-  transform-origin: right center;
-  background: linear-gradient(270deg, rgba(255, 122, 112, 0.55), rgba(255, 122, 112, 0.95));
-  border-radius: 5px 0 0 5px;
-}
-
-.thruster-value {
-  width: 38px;
-  text-align: right;
-  font-size: 11px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: #cfdde8;
-}
-
-/* ---------- 운항 모드 상태 ---------- */
-
-.mode-status {
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
+/* ---------- 운항 모드 색상 (플로팅 상태 배지) ---------- */
 
 .mode-dot {
   width: 7px;
@@ -629,7 +230,6 @@ input[type="range"]::-moz-range-thumb {
   animation: live-blink 1.6s ease-in-out infinite;
 }
 
-/* 색상 규칙은 상단 배지(.mode-status)와 컨트롤 패널 상태줄(.status-line)이 공유 */
 .mode-auto {
   color: #ffd9a0;
   border-color: rgba(255, 170, 60, 0.45);
@@ -659,19 +259,515 @@ input[type="range"]::-moz-range-thumb {
   color: #6fc3ff;
 }
 
-.status-line {
+/* ---------- 하단 콘솔 ---------- */
+
+.bottom-console {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  padding-top: 2px;
+  gap: 10px;
+  pointer-events: none;
 }
 
-.control.status-panel {
-  width: 185px;
-  gap: 10px;
+/* 콘솔 카드 중심축 위에 살짝 떨어져 떠 있는 상태 배지 */
+.floating-status {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
+.console-card {
+  position: static;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 16px;
+  pointer-events: auto;
+}
+
+/* 큼직한 라운드 사각 카드 — 게이지 공통 틀 */
+.gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 126px;
+  padding: 10px 8px 9px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+}
+
+.gauge-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #7f93a4;
+}
+
+.gauge-svg {
+  width: 100%;
+  flex: 1;
+}
+
+.gauge-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #e9eff4;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.gauge-unit {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7f93a4;
+  letter-spacing: 0.04em;
+}
+
+/* 나침반 */
+.compass-ring {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1.5;
+}
+
+.compass-tick {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+}
+
+.compass-tick.major {
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 1.6;
+}
+
+.compass-cardinal {
+  font-size: 10px;
+  font-weight: 700;
+  fill: #9fb4c4;
+}
+
+.compass-cardinal.north {
+  fill: #ff6b61;
+}
+
+.compass-needle {
+  fill: #6fc3ff;
+  filter: drop-shadow(0 0 3px rgba(111, 195, 255, 0.7));
+}
+
+.compass-hub {
+  fill: #e9eff4;
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 1;
+}
+
+/* 속도계 */
+.speed-arc {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.speed-arc.fwd {
+  stroke: rgba(76, 217, 100, 0.4);
+}
+
+.speed-arc.rev {
+  stroke: rgba(255, 122, 112, 0.35);
+}
+
+.speed-tick {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+}
+
+.speed-tick.major {
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.5;
+}
+
+.speed-label {
+  font-size: 8.5px;
+  font-weight: 650;
+  fill: #9fb4c4;
+}
+
+.speed-zone {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.speed-zone.fwd-zone {
+  fill: rgba(76, 217, 100, 0.75);
+}
+
+.speed-zone.rev-zone {
+  fill: rgba(255, 122, 112, 0.75);
+}
+
+.speed-needle {
+  stroke: #e9eff4;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(233, 239, 244, 0.5));
+}
+
+.speed-needle.rev {
+  stroke: #ff8a80;
+  filter: drop-shadow(0 0 3px rgba(255, 138, 128, 0.6));
+}
+
+.rev-chip {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0b1520;
+  background: #ff8a80;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 2px;
+}
+
+/* 세로 배터리 */
+.battv-card {
+  width: 96px;
+}
+
+.battv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
+.battv-cap {
+  width: 16px;
+  height: 5px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.battv-body {
+  position: relative;
+  width: 38px;
+  height: 62px;
+  margin-top: 1px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 아래에서 위로 차오르는 게이지 — scaleY(GPU 합성)로 리페인트 잔상 방지 */
+.battv-fill {
+  position: absolute;
+  inset: 2px;
+  border-radius: 5px;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+.battv-bolt {
+  position: relative;
+  color: #ffffff;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+
+.battv-high .battv-fill { background: linear-gradient(0deg, #2fa84c, #4cd964); }
+.battv-high .gauge-value { color: #9beeae; }
+.battv-mid .battv-fill { background: linear-gradient(0deg, #d9a613, #ffd447); }
+.battv-mid .gauge-value { color: #ffe28a; }
+.battv-low .battv-fill { background: linear-gradient(0deg, #c62828, #ff5252); }
+.battv-low .gauge-value { color: #ff9d9d; }
+.battv-low .battv-body { animation: live-blink 1.2s ease-in-out infinite; }
+
+/* 좌/우 추력 세로 바 */
+.thrust-card {
+  width: 96px;
+}
+
+.thrustv-wrap {
+  display: flex;
+  gap: 7px;
+  flex: 1;
+  align-items: center;
+}
+
+.thrustv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  /* 값이 "-100"~"0"으로 바뀌어도 폭이 흔들리지 않게 고정 */
+  width: 28px;
+}
+
+.thrustv-bar {
+  position: relative;
+  width: 15px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.thrustv-center {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 반높이 고정 + scaleY — 리페인트 잔상 없이 GPU 합성으로만 갱신 */
+.thrustv-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  transform: scaleY(0);
+  will-change: transform;
+}
+
+.thrustv-fill.up {
+  bottom: 50%;
+  transform-origin: center bottom;
+  background: linear-gradient(0deg, rgba(76, 217, 100, 0.55), rgba(76, 217, 100, 0.95));
+  border-radius: 6px 6px 0 0;
+}
+
+.thrustv-fill.down {
+  top: 50%;
+  transform-origin: center top;
+  background: linear-gradient(180deg, rgba(255, 122, 112, 0.55), rgba(255, 122, 112, 0.95));
+  border-radius: 0 0 6px 6px;
+}
+
+.thrustv-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f93a4;
+}
+
+.thrustv-value {
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: #cfdde8;
+}
+
+/* 구분선 + 액션 버튼 */
+.console-divider {
+  width: 1px;
+  margin: 6px 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.console-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 108px;
+  padding: 10px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #cfe2f2;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+}
+
+.console-btn svg {
+  color: #6fc3ff;
+}
+
+.console-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.console-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.console-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 비상정지 — 가장 눈에 띄게 */
+.console-btn.estop {
+  color: #ffd9d5;
+  background: linear-gradient(160deg, rgba(198, 40, 40, 0.5), rgba(140, 22, 22, 0.45));
+  border: 1px solid rgba(255, 82, 82, 0.65);
+  box-shadow: 0 0 14px rgba(255, 82, 82, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.console-btn.estop svg {
+  color: #ff8a80;
+}
+
+.console-btn.estop:hover {
+  background: linear-gradient(160deg, rgba(220, 50, 50, 0.62), rgba(160, 28, 28, 0.55));
+  border-color: rgba(255, 110, 110, 0.85);
+  box-shadow: 0 0 20px rgba(255, 82, 82, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- 웨이포인트 플래너 ---------- */
+
+.planner-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 9, 15, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: auto;
+  z-index: 30;
+}
+
+.planner {
+  position: static;
+  padding: 14px 16px;
+}
+
+.planner-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.planner-head svg {
+  color: #ffb84d;
+}
+
+.planner-head .minimap-zoom {
+  margin-left: 10px;
+}
+
+.planner-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: #b8ccdb;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.planner-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.planner-body {
+  display: flex;
+  gap: 12px;
+}
+
+.planner-body canvas {
+  cursor: crosshair;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.planner-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 172px;
+}
+
+.tool-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 11px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #9fb4c4;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.tool-status {
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd9a0;
+  background: rgba(255, 170, 60, 0.1);
+  border: 1px solid rgba(255, 170, 60, 0.3);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #cfe2f2;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool-btn.active {
+  color: #ffd9a0;
+  background: rgba(255, 170, 60, 0.16);
+  border-color: rgba(255, 170, 60, 0.45);
+}
+
+.tool-btn.tool-close {
+  margin-top: auto;
 }
 
 /* ---------- 선수 카메라 카드 ---------- */
@@ -679,7 +775,7 @@ input[type="range"]::-moz-range-thumb {
 /* 뷰 영역은 캔버스(FPV 시저 렌더)가 그대로 비쳐야 하므로
  * 패널 기본 배경·블러를 끄고 헤더에만 배경을 준다. */
 .camera-card {
-  top: 96px;
+  top: 16px;
   left: 16px;
   padding: 0;
   background: none;
@@ -687,6 +783,11 @@ input[type="range"]::-moz-range-thumb {
   -webkit-backdrop-filter: none;
   border-radius: 10px;
   overflow: hidden;
+}
+
+/* 스테이션 CCTV — FPV 카드 바로 아래 */
+.cctv-card {
+  top: 246px;
 }
 
 .camera-head {
@@ -732,9 +833,15 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .camera-view {
-  width: 268px;
-  height: 151px;
+  width: 336px;
+  height: 189px;
   background: transparent;
+}
+
+/* CCTV는 FPV보다 한 단계 작게 */
+.camera-view.cctv-view {
+  width: 336px;
+  height: 168px;
 }
 
 /* ---------- 미니맵 ---------- */
@@ -750,45 +857,28 @@ input[type="range"]::-moz-range-thumb {
   cursor: crosshair;
 }
 
+.minimap-gps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.minimap-gps-value {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #cfdde8;
+}
+
 .minimap-actions {
   display: flex;
   gap: 5px;
   align-items: center;
-  margin-top: 8px;
-}
-
-.minimap-actions button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #b8ccdb;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.minimap-actions button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.13);
-}
-
-.minimap-actions button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.minimap-actions button.active {
-  color: #ffd9a0;
-  background: rgba(255, 170, 60, 0.16);
-  border-color: rgba(255, 170, 60, 0.45);
+  margin-top: 5px;
 }
 
 .minimap-actions .hint {
-  margin-left: auto;
   font-size: 10px;
 }
 
