@@ -296,48 +296,75 @@ body {
   pointer-events: auto;
 }
 
-/* 큼직한 라운드 사각 카드 — 게이지 공통 틀 */
+/* 게이지 열 — 모든 게이지가 「그림 영역(고정 높이) + 값 행」의 동일한 2단 구조.
+ * 값 행이 네 열 모두 같은 줄에 정렬되고, 그림은 영역 안에서 세로 중앙 정렬된다. */
 .gauge-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  width: 126px;
-  padding: 10px 8px 9px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 14px;
+  gap: 8px;
+  padding: 2px 0;
 }
 
-.gauge-title {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #7f93a4;
-}
-
-.gauge-svg {
-  width: 100%;
-  flex: 1;
+.gauge-figure {
+  height: 122px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
 }
 
 .gauge-value {
-  font-size: 14px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #e9eff4;
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
 }
 
 .gauge-unit {
   font-style: normal;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #7f93a4;
   letter-spacing: 0.04em;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+.gauge-card.compass-card {
+  width: 140px;
+}
+
+.compass-svg {
+  width: 122px;
+  height: 122px;
+}
+
+.gauge-card.speed-card {
+  width: 180px;
+}
+
+/* viewBox 94×63 크롭에 맞춘 표시 크기 (종횡비 유지) */
+.speed-svg {
+  width: 172px;
+  height: 115px;
+}
+
+.gauge-card.battv-card {
+  width: 100px;
+}
+
+.gauge-card.thrust-card {
+  width: 104px;
+}
+
+/* 추력 바 두 개는 좁은 간격으로 붙인다 */
+.thrust-card .gauge-figure {
+  gap: 10px;
 }
 
 /* 나침반 */
@@ -376,6 +403,10 @@ body {
   fill: #e9eff4;
   stroke: rgba(0, 0, 0, 0.4);
   stroke-width: 1;
+}
+
+.gauge-card.compass-card {
+  width: 158px;
 }
 
 /* 속도계 */
@@ -446,32 +477,26 @@ body {
 }
 
 /* 세로 배터리 */
-.battv-card {
-  width: 96px;
-}
-
 .battv {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
-  justify-content: center;
 }
 
 .battv-cap {
-  width: 16px;
-  height: 5px;
-  border-radius: 3px 3px 0 0;
+  width: 24px;
+  height: 7px;
+  border-radius: 4px 4px 0 0;
   background: rgba(255, 255, 255, 0.35);
 }
 
 .battv-body {
   position: relative;
-  width: 38px;
-  height: 62px;
+  width: 56px;
+  height: 96px;
   margin-top: 1px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 11px;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -502,33 +527,23 @@ body {
 .battv-low .gauge-value { color: #ff9d9d; }
 .battv-low .battv-body { animation: live-blink 1.2s ease-in-out infinite; }
 
-/* 좌/우 추력 세로 바 */
-.thrust-card {
-  width: 96px;
-}
-
-.thrustv-wrap {
-  display: flex;
-  gap: 7px;
-  flex: 1;
-  align-items: center;
-}
-
+/* 좌/우 추력 세로 필(pill) 게이지 — 배터리와 톤을 맞춘 큼직한 세로형 */
 .thrustv {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   /* 값이 "-100"~"0"으로 바뀌어도 폭이 흔들리지 않게 고정 */
-  width: 28px;
+  width: 32px;
 }
 
 .thrustv-bar {
   position: relative;
-  width: 15px;
-  height: 60px;
-  background: rgba(255, 255, 255, 0.07);
-  border-radius: 7px;
+  width: 22px;
+  height: 102px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
   overflow: hidden;
 }
 
@@ -537,8 +552,8 @@ body {
   top: 50%;
   left: 0;
   right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.3);
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* 반높이 고정 + scaleY — 리페인트 잔상 없이 GPU 합성으로만 갱신 */
@@ -555,29 +570,32 @@ body {
   bottom: 50%;
   transform-origin: center bottom;
   background: linear-gradient(0deg, rgba(76, 217, 100, 0.55), rgba(76, 217, 100, 0.95));
-  border-radius: 6px 6px 0 0;
+  border-radius: 9px 9px 0 0;
 }
 
 .thrustv-fill.down {
   top: 50%;
   transform-origin: center top;
   background: linear-gradient(180deg, rgba(255, 122, 112, 0.55), rgba(255, 122, 112, 0.95));
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 9px 9px;
 }
 
 .thrustv-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: #7f93a4;
 }
 
-.thrustv-value {
-  width: 100%;
+/* 추력 값 행 — 각 바 아래에 정렬되는 두 값.
+ * span 폭 = 열 폭(32) + 열 간격(10) → 두 행을 각각 중앙 정렬하면 바 중심과 일치 */
+.thrust-values {
+  gap: 0;
+}
+
+.thrust-values span {
+  width: 42px;
   text-align: center;
-  font-size: 11px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: #cfdde8;
+  font-size: 13px;
 }
 
 /* 구분선 + 액션 버튼 */
@@ -593,7 +611,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 108px;
+  width: 112px;
+  height: 112px; /* 정사각형 — 게이지 열 높이와 무관하게 세로 중앙 정렬 */
+  align-self: center;
   padding: 10px 8px;
   font-size: 12px;
   font-weight: 700;
@@ -673,8 +693,11 @@ body {
   color: #ffb84d;
 }
 
-.planner-head .minimap-zoom {
-  margin-left: 10px;
+.planner-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #dfeaf3;
 }
 
 .planner-close {
@@ -697,77 +720,120 @@ body {
 
 .planner-body {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
-.planner-body canvas {
+.planner-map {
+  position: relative;
+}
+
+/* 지도 크기 — 기본 1080×680, 화면이 작으면 종횡비를 유지한 채 축소 */
+.planner-map canvas {
+  width: min(1080px, calc(100vw - 120px), calc((100vh - 150px) * 1080 / 680));
+  aspect-ratio: 1080 / 680;
   cursor: crosshair;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
-.planner-tools {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 172px;
-}
-
-.tool-hint {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 11px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #9fb4c4;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-}
-
-.tool-status {
-  padding: 8px 11px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #ffd9a0;
-  background: rgba(255, 170, 60, 0.1);
-  border: 1px solid rgba(255, 170, 60, 0.3);
-  border-radius: 10px;
-  text-align: center;
-}
-
-.tool-btn {
+/* 지도 위 오버레이 공용 버튼 */
+.map-overlay-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 650;
-  color: #cfe2f2;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #e2edf6;
+  background: rgba(9, 16, 25, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.12s ease;
 }
 
-.tool-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.11);
+.map-overlay-btn:hover:not(:disabled) {
+  background: rgba(30, 45, 62, 0.85);
 }
 
-.tool-btn:disabled {
+.map-overlay-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 도움말 — 지도 좌측 상단, 호버 시 설명 팝오버 */
+.map-help {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+
+.map-help-pop {
+  display: none;
+  position: absolute;
+  top: 38px;
+  left: 0;
+  flex-direction: column;
+  gap: 6px;
+  width: 236px;
+  padding: 12px 13px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #dbe7f1;
+  background: rgba(9, 16, 25, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.map-help:hover .map-help-pop {
+  display: flex;
+}
+
+/* 확대/축소 — 지도 우측 상단 오버레이 */
+.map-zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+/* 출발/취소/삭제 — 지도 우측 하단 오버레이, 아이콘 전용 정사각 버튼 */
+.map-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.tool-sq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: #e2edf6;
+  background: rgba(9, 16, 25, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.tool-sq:hover:not(:disabled) {
+  background: rgba(30, 45, 62, 0.88);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tool-sq:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.tool-btn.active {
+.tool-sq.active {
   color: #ffd9a0;
-  background: rgba(255, 170, 60, 0.16);
-  border-color: rgba(255, 170, 60, 0.45);
-}
-
-.tool-btn.tool-close {
-  margin-top: auto;
+  background: rgba(80, 52, 12, 0.85);
+  border-color: rgba(255, 170, 60, 0.55);
 }
 
 /* ---------- 선수 카메라 카드 ---------- */

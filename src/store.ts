@@ -167,8 +167,14 @@ export const useSimStore = create<SimStore>((set) => ({
       if (!isNavigableForRoute(p.x, p.z)) return {}; // 물 밖 클릭은 무시
       const waypoints = [...st.waypoints, p];
       const route = replanRoute(st.usv, waypoints, st.reachedCount);
-      // 웨이포인트를 찍으면 곧바로 자동 항해 시작 (일반 항해 모드)
-      return { waypoints, route, autopilot: route != null, returningToStation: false };
+      // 핀만 추가·경로 미리보기 — 항해는 출발 버튼을 눌러야 시작된다.
+      // (이미 자동 항해 중이면 새 핀을 경로에 이어 붙이고 그대로 항해 유지)
+      return {
+        waypoints,
+        route,
+        autopilot: st.autopilot && route != null,
+        returningToStation: false,
+      };
     }),
   moveWaypoint: (index, p) =>
     set((st) => {
