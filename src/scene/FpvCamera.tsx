@@ -11,6 +11,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { WATER_LEVEL_Y } from "../sim/waves";
 import { config } from "../config";
+import { ZONE_LAYER } from "./StationZone";
 
 /** 장착 위치 (USV 그룹 로컬, 선수 = -z): 데크 앞끝 중앙, 선수 난간(높이 ~2.1m) 바로 위 —
  * 난간·데크가 프레임 하단에 살짝 걸려 1인칭감을 주되 렌즈를 가리지는 않는 높이. */
@@ -28,6 +29,8 @@ const WATER_LEVEL = config.vworldKey ? WATER_LEVEL_Y : 0;
 export const cctvCamera = new THREE.PerspectiveCamera(50, 16 / 9, 0.5, 6000);
 cctvCamera.position.set(-70, 42, 70);
 cctvCamera.lookAt(0, WATER_LEVEL, 0);
+// CCTV는 스테이션 존 표시(노란 빛기둥·링)는 보이되, 항로 레이어(1)는 보지 않는다
+cctvCamera.layers.enable(ZONE_LAYER);
 
 /** HUD 카드 영역에 카메라 뷰 하나를 시저 렌더링 */
 function renderScissorView(

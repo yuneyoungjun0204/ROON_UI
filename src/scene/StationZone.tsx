@@ -1,14 +1,17 @@
 // 스테이션 존 — 선박의 초기 위치(로컬 원점)를 중심으로 한 기지 구역 표시.
 // 하늘로 뻗는 빛기둥: 위로 갈수록 잦아드는 반투명 원통 벽(가산 블렌딩) +
 // 얇은 수면 테두리 + 바깥으로 번지는 글로우 링. 은은한 펄스로 시선을 끈다.
-// 항로 표시와 같은 레이어에 두어 FPV(선수 카메라)에는 나타나지 않는다.
+// 전용 레이어에 두어 메인 카메라·스테이션 CCTV에는 보이고,
+// FPV(선수 카메라)에는 나타나지 않는다. (항로 레이어와는 별도)
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { WATER_LEVEL_Y } from "../sim/waves";
 import { config, STATION_ZONE_RADIUS_M } from "../config";
-import { ROUTE_LAYER } from "./RouteLine";
+
+/** 스테이션 존 표시 전용 레이어 — CCTV에는 보이되 FPV에는 숨긴다 */
+export const ZONE_LAYER = 2;
 
 const ZONE_Y = config.vworldKey ? WATER_LEVEL_Y : 0;
 const RADIUS = STATION_ZONE_RADIUS_M;
@@ -84,6 +87,7 @@ function makeGlowMaterial() {
 
 export function StationZone() {
   const groupRef = useRef<THREE.Group>(null);
+  const camera = useThree((s) => s.camera);
   const wallMat = useMemo(makeWallMaterial, []);
   const glowMat = useMemo(makeGlowMaterial, []);
 
@@ -95,9 +99,14 @@ export function StationZone() {
     [wallMat, glowMat],
   );
 
-  // 레이어는 상속되지 않으므로 마운트 시 전체를 항로 레이어로 옮긴다
+  // 메인 카메라가 존 레이어를 보도록 켠다 (CCTV는 FpvCamera 쪽에서 켠다)
   useEffect(() => {
-    groupRef.current?.traverse((o) => o.layers.set(ROUTE_LAYER));
+    camera.layers.enable(ZONE_LAYER);
+  }, [camera]);
+
+  // 레이어는 상속되지 않으므로 마운트 시 전체를 존 레이어로 옮긴다
+  useEffect(() => {
+    groupRef.current?.traverse((o) => o.layers.set(ZONE_LAYER));
   }, []);
 
   useFrame(({ clock }) => {
