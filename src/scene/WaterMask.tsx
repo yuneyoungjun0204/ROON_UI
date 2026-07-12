@@ -12,7 +12,10 @@ import { useSimStore } from "../store";
 const WATER_Y = WATER_LEVEL_Y; // 수면 기준 높이 — 물가 턱을 덮도록 올림
 const WATER_SIZE = 7200;
 const WATER_SEGMENTS = 160; // 잔잔한 챱(진폭 ~0.14m)이라 성긴 격자로 충분 — 정점 5배 절감
-const TRAIL_N = 32; // 항적 포말 포인트 수 (프래그먼트 루프 부하 절감)
+const TRAIL_N = 64; // 항적 포말 포인트 수 — 두 헐 × 촘촘한 간격을 담을 만큼
+const WAKE_SPACING_M = 2.0; // 항적 방출 간격 (이동 거리 기준 — 속도와 무관하게 고른 띠)
+const WAKE_STERN_AFT_M = 7.2; // 선미 방출점 (선체 중심 기준 후방)
+const WAKE_HULL_OFFSET_M = 2.55; // 좌/우 헐 중심 측방 오프셋 (쌍동선 데미헐 간격)
 const MIN_WATER_AREA_M2 = 2_500;
 const CACHE_KEY = "daecheong-water-mask-overpass-v1";
 const OVERPASS_ENDPOINTS = [
@@ -134,15 +137,17 @@ void main() {
     vec4 tp = uTrail[i];
     float age = uTime - tp.z;
     if (tp.w > 0.001 && age > 0.0 && age < 14.0) {
-      float rad = 1.6 + age * 1.15;
+      float rad = 1.35 + age * 0.9; // 천천히 퍼진다 — 이웃 점과 겹쳐 연속된 띠가 되게
       float d = distance(vWorldPos.xz, tp.xy);
-      wake += tp.w * exp(-age * 0.30) * smoothstep(rad, rad * 0.2, d);
+      float fadeIn = smoothstep(0.0, 0.45, age); // 탁 튀며 생기지 않게 서서히 등장
+      wake += tp.w * fadeIn * exp(-age * 0.26) * smoothstep(rad, rad * 0.15, d);
     }
   }
   wake = clamp(wake, 0.0, 1.0);
 
   float foamNoise = 0.55 + 0.45 * noise(vWorldPos.xz * 0.9 + uTime * 0.2);
-  float foam = clamp(crestFoam * 0.45 + wake, 0.0, 1.0) * foamNoise;
+  // 항적은 노이즈를 약하게 태워 끊김 없이, 파도 마루 포말은 기존대로 얼룩덜룩하게
+  float foam = clamp(crestFoam * 0.45 * foamNoise + wake * (0.68 + 0.32 * foamNoise), 0.0, 1.0);
   color = mix(color, vec3(0.94, 0.97, 0.98), foam * 0.85);
 
   // 물가 전이 — 수역 마스크 경계 근처(뭍 쪽)에 얕은 물 톤 + 찰랑이는 포말 띠
@@ -390,7 +395,7 @@ export function WaterMask({ sunDir }: { sunDir: THREE.Vector3 }) {
     () => Array.from({ length: TRAIL_N }, () => new THREE.Vector4(0, 0, -1000, 0)),
     [],
   );
-  const wakeState = useRef({ nextIdx: 0, lastEmit: -1 });
+  const wakeState = useRef({ nextIdx: 0, lastEmit: -1, lastX: 0, lastZ: 0 });
 
   const uniforms = useMemo(
     () => ({
@@ -434,21 +439,44 @@ export function WaterMask({ sunDir }: { sunDir: THREE.Vector3 }) {
       }
     }
 
-    // 배 뒤로 항적 포말을 주기적으로 뿌린다
+    // 항적 포말 — 좌/우 데미헐 후미에서 한 쌍씩, 이동 거리 기준으로 고르게 방출.
+    // (시간 기준이면 속도에 따라 점 간격이 벌어져 뚝뚝 끊긴 띠가 된다)
     const { usv } = useSimStore.getState();
     const spd = Math.abs(usv.speed);
     const ws = wakeState.current;
-    if (t - ws.lastEmit > 0.22 && spd > 0.6) {
+    const moved = Math.hypot(usv.x - ws.lastX, usv.z - ws.lastZ);
+    const churn = Math.max(Math.abs(usv.thrustPort), Math.abs(usv.thrustStbd)) / 100;
+    const shouldEmit =
+      (moved >= WAKE_SPACING_M && spd > 0.4) ||
+      // 제자리 회전(pivot) — 거의 안 움직여도 쓰러스터가 물을 휘저으면 거품
+      (t - ws.lastEmit > 0.4 && churn > 0.4 && spd <= 0.4);
+    if (shouldEmit) {
       ws.lastEmit = t;
-      const strength = Math.min(spd / 8, 1);
+      ws.lastX = usv.x;
+      ws.lastZ = usv.z;
       const rad = (usv.heading * Math.PI) / 180;
       const fwdX = Math.sin(rad);
       const fwdZ = -Math.cos(rad); // 북쪽 = -z
-      const sign = Math.sign(usv.speed || 1);
-      trail[ws.nextIdx].set(usv.x - fwdX * 7.5 * sign, usv.z - fwdZ * 7.5 * sign, t, strength);
-      ws.nextIdx = (ws.nextIdx + 1) % TRAIL_N;
-      trail[ws.nextIdx].set(usv.x + fwdX * 7.0, usv.z + fwdZ * 7.0, t, strength * 0.4);
-      ws.nextIdx = (ws.nextIdx + 1) % TRAIL_N;
+      const stbX = -fwdZ; // 우현 방향
+      const stbZ = fwdX;
+      const base = Math.min(spd / 7, 1);
+      // 각 헐의 웨이크는 그 쪽 쓰러스터 출력(프로펠러 후류)에서만 나온다 —
+      // 한쪽만 추진하면 그쪽 헐 뒤에만 물자국이 남고, 차동 선회 시 좌우 비대칭이 보인다.
+      // 쓰러스터는 후미 고정 장착이므로 후진 중에도 방출점은 항상 선미다.
+      const emit = (lateral: number, thrustPct: number) => {
+        const use = Math.abs(thrustPct) / 100; // 0~1
+        if (use < 0.04) return; // 쓰러스터가 꺼진 헐에서는 웨이크 없음
+        const strength = Math.min(1, Math.pow(use, 0.7) * (0.45 + 0.55 * base));
+        trail[ws.nextIdx].set(
+          usv.x - fwdX * WAKE_STERN_AFT_M + stbX * lateral,
+          usv.z - fwdZ * WAKE_STERN_AFT_M + stbZ * lateral,
+          t,
+          strength,
+        );
+        ws.nextIdx = (ws.nextIdx + 1) % TRAIL_N;
+      };
+      emit(-WAKE_HULL_OFFSET_M, usv.thrustPort); // 좌현 헐
+      emit(WAKE_HULL_OFFSET_M, usv.thrustStbd); // 우현 헐
     }
   });
 

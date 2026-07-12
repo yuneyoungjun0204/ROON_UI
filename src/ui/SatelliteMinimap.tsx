@@ -1,73 +1,25 @@
+// 위성 미니맵 — 선박 중심 추적, 클릭으로 웨이포인트 추가.
+// 투영·타일·항법 오버레이는 mapShared와 웨이포인트 플래너가 공유한다.
+
 import { useEffect, useRef, useState } from "react";
 import { Plus, Minus } from "lucide-react";
 import { config } from "../config";
-import { localMetersToLonLat } from "../geo/webMercator";
-import { trail, useSimStore } from "../store";
+import { lonLatToLocalMeters } from "../geo/webMercator";
+import { useSimStore } from "../store";
+import {
+  MAP_ZOOMS,
+  drawBoat,
+  drawRoute,
+  drawStationZone,
+  drawTileLayers,
+  drawWaypoints,
+  makeToCanvas,
+  metersPerPixel,
+  project,
+  unproject,
+} from "./mapShared";
 
 const CSS_SIZE = 285;
-const TILE_SIZE = 256;
-const ZOOMS = [18, 17, 16, 15];
-const tileImages = new Map<string, HTMLImageElement>();
-
-function project(lon: number, lat: number, zoom: number) {
-  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
-  const latRad = (clampedLat * Math.PI) / 180;
-  const scale = TILE_SIZE * 2 ** zoom;
-  return {
-    x: ((lon + 180) / 360) * scale,
-    y:
-      ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
-      scale,
-  };
-}
-
-function metersPerPixel(lat: number, zoom: number) {
-  return (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
-}
-
-function vworldTileUrl(layer: "Satellite" | "Hybrid", zoom: number, x: number, y: number) {
-  const ext = layer === "Satellite" ? "jpeg" : "png";
-  return `https://api.vworld.kr/req/wmts/1.0.0/${config.vworldKey}/${layer}/${zoom}/${y}/${x}.${ext}`;
-}
-
-function getTileImage(url: string) {
-  const cached = tileImages.get(url);
-  if (cached) return cached;
-
-  const image = new Image();
-  image.crossOrigin = "anonymous";
-  image.src = url;
-  tileImages.set(url, image);
-  return image;
-}
-
-function drawTileLayer(
-  ctx: CanvasRenderingContext2D,
-  layer: "Satellite" | "Hybrid",
-  zoom: number,
-  center: { x: number; y: number },
-  size: number,
-) {
-  const half = size / 2;
-  const minTileX = Math.floor((center.x - half) / TILE_SIZE);
-  const maxTileX = Math.floor((center.x + half) / TILE_SIZE);
-  const minTileY = Math.floor((center.y - half) / TILE_SIZE);
-  const maxTileY = Math.floor((center.y + half) / TILE_SIZE);
-
-  for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
-    for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
-      const image = getTileImage(vworldTileUrl(layer, zoom, tileX, tileY));
-      if (!image.complete || image.naturalWidth === 0) continue;
-      ctx.drawImage(
-        image,
-        tileX * TILE_SIZE - center.x + half,
-        tileY * TILE_SIZE - center.y + half,
-        TILE_SIZE,
-        TILE_SIZE,
-      );
-    }
-  }
-}
 
 function pickScaleBar(metersPerPx: number) {
   const targetMeters = 76 * metersPerPx;
@@ -80,6 +32,21 @@ function pickScaleBar(metersPerPx: number) {
 export function Minimap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
+  const addWaypoint = useSimStore((s) => s.addWaypoint);
+  const undoWaypoint = useSimStore((s) => s.undoWaypoint);
+  const gps = useSimStore((s) => `${s.usv.lat.toFixed(5)}, ${s.usv.lon.toFixed(5)}`);
+
+  /** 캔버스 클릭 위치 → 씬 로컬 미터 좌표 */
+  const clickToLocal = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - rect.left - CSS_SIZE / 2;
+    const dy = e.clientY - rect.top - CSS_SIZE / 2;
+    const { usv } = useSimStore.getState();
+    const zoom = MAP_ZOOMS[zoomIdx];
+    const center = project(usv.lon, usv.lat, zoom);
+    const { lon, lat } = unproject(center.x + dx, center.y + dy, zoom);
+    return lonLatToLocalMeters(lon, lat, config.initialLon, config.initialLat);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,12 +58,12 @@ export function Minimap() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const zoom = ZOOMS[zoomIdx];
+    const zoom = MAP_ZOOMS[zoomIdx];
     let raf = 0;
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      const { usv } = useSimStore.getState();
+      const { usv, route, waypoints, reachedCount } = useSimStore.getState();
       const W = CSS_SIZE;
       const half = W / 2;
       const center = project(usv.lon, usv.lat, zoom);
@@ -105,13 +72,7 @@ export function Minimap() {
       ctx.fillStyle = "#07111a";
       ctx.fillRect(0, 0, W, W);
 
-      if (config.vworldKey) {
-        drawTileLayer(ctx, "Satellite", zoom, center, W);
-        ctx.save();
-        ctx.globalAlpha = 0.82;
-        drawTileLayer(ctx, "Hybrid", zoom, center, W);
-        ctx.restore();
-      }
+      drawTileLayers(ctx, zoom, center, W, W);
 
       const gradient = ctx.createRadialGradient(half, half, W * 0.18, half, half, W * 0.78);
       gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
@@ -119,49 +80,19 @@ export function Minimap() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, W, W);
 
-      if (trail.length >= 4) {
-        ctx.strokeStyle = "rgba(116, 217, 255, 0.92)";
-        ctx.lineWidth = 2;
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-        for (let i = 0; i < trail.length; i += 2) {
-          const point = localMetersToLonLat(
-            trail[i],
-            trail[i + 1],
-            config.initialLon,
-            config.initialLat,
-          );
-          const projected = project(point.lon, point.lat, zoom);
-          const px = half + (projected.x - center.x);
-          const py = half + (projected.y - center.y);
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.lineTo(half, half);
-        ctx.stroke();
-      }
+      const toCanvas = makeToCanvas(center, zoom, W, W);
+      const mpp = metersPerPixel(usv.lat, zoom);
 
-      ctx.save();
-      ctx.translate(half, half);
-      ctx.rotate((usv.heading * Math.PI) / 180);
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.45)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(0, -8);
-      ctx.lineTo(5, 7);
-      ctx.lineTo(-5, 7);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+      drawStationZone(ctx, toCanvas, mpp);
+      drawRoute(ctx, toCanvas, route);
+      drawWaypoints(ctx, toCanvas, waypoints, reachedCount);
+      drawBoat(ctx, half, half, usv.heading);
 
       ctx.fillStyle = "rgba(235, 246, 255, 0.92)";
       ctx.font = "600 10px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("N", half, 12);
 
-      const mpp = metersPerPixel(usv.lat, zoom);
       const barMeters = pickScaleBar(mpp);
       const barPx = barMeters / mpp;
       ctx.strokeStyle = "rgba(235, 246, 255, 0.85)";
@@ -195,8 +126,8 @@ export function Minimap() {
             <Plus size={13} />
           </button>
           <button
-            onClick={() => setZoomIdx((i) => Math.min(ZOOMS.length - 1, i + 1))}
-            disabled={zoomIdx === ZOOMS.length - 1}
+            onClick={() => setZoomIdx((i) => Math.min(MAP_ZOOMS.length - 1, i + 1))}
+            disabled={zoomIdx === MAP_ZOOMS.length - 1}
             aria-label="축소"
           >
             <Minus size={13} />
@@ -206,7 +137,20 @@ export function Minimap() {
       <canvas
         ref={canvasRef}
         style={{ width: CSS_SIZE, height: CSS_SIZE, borderRadius: 8, display: "block" }}
+        onClick={(e) => addWaypoint(clickToLocal(e))}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          undoWaypoint();
+        }}
+        title="클릭: 웨이포인트 추가 · 우클릭: 마지막 취소"
       />
+      <div className="minimap-gps">
+        <span className="label">GPS</span>
+        <span className="minimap-gps-value">{gps}</span>
+      </div>
+      <div className="minimap-actions">
+        <span className="hint">클릭: 웨이포인트 · 우클릭: 취소 · 상세 편집은 웨이포인트 버튼</span>
+      </div>
     </div>
   );
 }

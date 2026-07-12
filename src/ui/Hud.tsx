@@ -1,15 +1,29 @@
-// HUD — 항법 정보 표시와 타각/스로틀 수동 조작.
-// 키보드: ←/→ 타각, ↑/↓ 스로틀, Space 타 중앙.
+// HUD — 항법 정보 표시와 조작 콘솔.
+// 키보드: ←/→(A/D) 조향, ↑/↓(W/S) 스로틀, Space 스로틀 0, R 홀드 초기화.
+// 하단 콘솔: 나침반 · 속도계 · 배터리 · 추력 | 웨이포인트 · 스테이션 복귀 · 비상정지.
 
-import { useEffect } from "react";
-import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Wifi,
+  WifiOff,
+  Loader2,
+  TerminalSquare,
+  Video,
+  Anchor,
+  Bot,
+  Gamepad2,
+  OctagonX,
+  RotateCcw,
+  BatteryLow,
+  MapPin,
+  Cctv,
+} from "lucide-react";
 import { useSimStore } from "../store";
-import { MAX_RUDDER_DEG } from "../sim/usvSim";
-import { config } from "../config";
+import { config, STATION_ZONE_RADIUS_M } from "../config";
 import { controls, resetControls } from "../sim/controls";
 import { Minimap } from "./SatelliteMinimap";
-
-const MS_TO_KN = 1.943844;
+import { WaypointPlanner } from "./WaypointPlanner";
+import { CompassGauge, SpeedGauge, BatteryGauge, ThrustBars } from "./gauges";
 
 function StatusBadge() {
   const status = useSimStore((s) => s.mqttStatus);
@@ -24,11 +38,68 @@ function StatusBadge() {
   );
 }
 
+/** 운항 모드 표시 내용 — 플로팅 상태 배지가 사용 */
+function ModeIndicator({ prefix }: { prefix?: string }) {
+  const autopilot = useSimStore((s) => s.autopilot);
+  const returning = useSimStore((s) => s.returningToStation);
+  const Icon = autopilot ? (returning ? Anchor : Bot) : Gamepad2;
+  const label = autopilot
+    ? returning
+      ? "스테이션 복귀 중"
+      : "자율 운항 중"
+    : "수동 조작 중";
+  return (
+    <>
+      <span className="mode-dot" />
+      <Icon size={15} />
+      <span>
+        {prefix}
+        {label}
+      </span>
+    </>
+  );
+}
+
+/** 화면 중앙 오버레이 — R키 홀드 초기화 게이지, 배터리 방전 견인 안내 */
+function CenterOverlay() {
+  const resetProgress = useSimStore((s) => s.resetProgress);
+  const battery = useSimStore((s) => s.battery);
+
+  if (resetProgress > 0) {
+    return (
+      <div className="panel center-overlay">
+        <div className="overlay-title">
+          <RotateCcw size={15} />
+          <span>초기화 중…</span>
+        </div>
+        <div className="reset-gauge">
+          <div className="reset-gauge-fill" style={{ width: `${Math.min(100, resetProgress * 100)}%` }} />
+        </div>
+        <span className="overlay-sub">{Math.floor(Math.min(100, resetProgress * 100))}% — R키를 계속 누르고 계세요</span>
+      </div>
+    );
+  }
+  if (battery <= 0) {
+    return (
+      <div className="panel center-overlay overlay-danger">
+        <div className="overlay-title">
+          <BatteryLow size={16} />
+          <span>배터리 방전 — 조작 불능</span>
+        </div>
+        <span className="overlay-sub">R키를 2초 동안 눌러 견인하세요.</span>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function Hud() {
   const usv = useSimStore((s) => s.usv);
   const lastCommand = useSimStore((s) => s.lastCommand);
-  const setRudderCmd = useSimStore((s) => s.setRudderCmd);
-  const setThrottle = useSimStore((s) => s.setThrottle);
+  const returnToStation = useSimStore((s) => s.returnToStation);
+  const emergencyStop = useSimStore((s) => s.emergencyStop);
+  const autopilot = useSimStore((s) => s.autopilot);
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   useEffect(() => {
     // 키를 누르는 "동안" 지령을 램프한다 (실제 반영은 시뮬 루프에서 dt 기반으로).
@@ -38,11 +109,12 @@ export function Hud() {
       else if (key === "d" || e.key === "ArrowRight") controls.right = down;
       else if (key === "w" || e.key === "ArrowUp") controls.throttleUp = down;
       else if (key === "s" || e.key === "ArrowDown") controls.throttleDown = down;
-      else if (e.key === " ") {
-        if (down) {
-          useSimStore.getState().setRudderCmd(0);
-          controls.steering = false;
-        }
+      else if (key === "r") {
+        // R 홀드 = 전체 초기화 (1초 후 게이지 시작, 1초 만에 완충)
+        controls.resetHeld = down;
+      } else if (e.key === " ") {
+        // Space = 스로틀 0 (정지 지령)
+        if (down) useSimStore.getState().setThrottle(0);
       } else return;
       e.preventDefault();
     };
@@ -58,33 +130,35 @@ export function Hud() {
     };
   }, []);
 
-  const sog = usv.speed * MS_TO_KN;
+  // 스테이션 존(원점 반경) 안이면 복귀 버튼 비활성
+  const inStationZone = Math.hypot(usv.x, usv.z) <= STATION_ZONE_RADIUS_M;
 
   return (
     <div className="hud">
-      <div className="panel readouts">
-        <div className="readout">
-          <Navigation size={15} style={{ transform: `rotate(${usv.heading}deg)` }} />
-          <div>
-            <span className="label">HDG</span>
-            <span className="value">{usv.heading.toFixed(1).padStart(5, "0")}°</span>
-          </div>
+      <div className="panel camera-card">
+        <div className="camera-head">
+          <Video size={13} />
+          <span className="label">카메라</span>
+          <span className="camera-live">
+            <span className="camera-live-dot" />
+            LIVE
+          </span>
         </div>
-        <div className="readout">
-          <Gauge size={15} />
-          <div>
-            <span className="label">SOG</span>
-            <span className="value">{sog.toFixed(1)} kn</span>
-          </div>
+        {/* 실제 영상은 3D 캔버스가 이 영역 위치에 시저 렌더링한다 — 배경 투명 유지 */}
+        <div id="fpv-view" className="camera-view" />
+      </div>
+
+      {/* 스테이션 존 고정 CCTV — 선박과 무관하게 항상 같은 곳을 비춘다 */}
+      <div className="panel camera-card cctv-card">
+        <div className="camera-head">
+          <Cctv size={13} />
+          <span className="label">스테이션 CCTV</span>
+          <span className="camera-live">
+            <span className="camera-live-dot" />
+            LIVE
+          </span>
         </div>
-        <div className="readout wide">
-          <div>
-            <span className="label">POSITION</span>
-            <span className="value small">
-              {usv.lat.toFixed(5)}, {usv.lon.toFixed(5)}
-            </span>
-          </div>
-        </div>
+        <div id="cctv-view" className="camera-view cctv-view" />
       </div>
 
       <div className="panel top-right">
@@ -98,60 +172,44 @@ export function Hud() {
         )}
       </div>
 
-      <div className="panel controls">
-        <div className="control">
-          <div className="control-head">
-            <span className="label">RUDDER</span>
-            <span className="value">
-              {usv.rudder < -0.05 ? (
-                <span className="dir dir-port">PORT</span>
-              ) : usv.rudder > 0.05 ? (
-                <span className="dir dir-stbd">STBD</span>
-              ) : null}
-              {Math.abs(usv.rudder).toFixed(0)}°
-            </span>
-          </div>
-          <div className="slider-wrap">
-            {/* 타 중앙(0°) 눈금 */}
-            <div className="tick" style={{ left: "50%" }} />
-            <input
-              type="range"
-              min={-MAX_RUDDER_DEG}
-              max={MAX_RUDDER_DEG}
-              step={1}
-              value={usv.rudderCmd}
-              onChange={(e) => setRudderCmd(Number(e.target.value))}
-            />
-          </div>
-          <div className="control-foot">
-            <button className="center-btn" onClick={() => setRudderCmd(0)}>
-              타 중앙 (Space)
-            </button>
-            <span className="hint">←/→ 또는 A/D</span>
-          </div>
+      {/* 하단 콘솔 — 게이지 + 액션 버튼, 위에 플로팅 상태 배지 */}
+      <div className="bottom-console">
+        <div className={`panel floating-status ${autopilot ? "mode-auto" : "mode-manual"}`}>
+          <ModeIndicator prefix="현재 상태: " />
         </div>
-        <div className="control">
-          <div className="control-head">
-            <span className="label">THROTTLE</span>
-            <span className="value">{usv.throttle.toFixed(0)}%</span>
-          </div>
-          <div className="slider-wrap">
-            {/* 스로틀 0% 눈금 (범위 -25~100 → 20% 지점) */}
-            <div className="tick" style={{ left: "20%" }} />
-            <input
-              type="range"
-              min={-25}
-              max={100}
-              step={5}
-              value={usv.throttle}
-              onChange={(e) => setThrottle(Number(e.target.value))}
-            />
-          </div>
-          <div className="control-foot">
-            <span className="hint">↑/↓ 또는 W/S · 떼면 유지</span>
-          </div>
+        <div className="panel console-card">
+          <CompassGauge />
+          <SpeedGauge />
+          <BatteryGauge />
+          <ThrustBars />
+          <div className="console-divider" />
+          <button className="console-btn" onClick={() => setPlannerOpen(true)}>
+            <MapPin size={22} />
+            <span>웨이포인트</span>
+          </button>
+          <button
+            className="console-btn"
+            onClick={returnToStation}
+            disabled={inStationZone}
+            title={inStationZone ? "이미 스테이션 존 안에 있습니다" : undefined}
+          >
+            <Anchor size={22} />
+            <span>{inStationZone ? "존 내 위치" : "스테이션 복귀"}</span>
+          </button>
+          <button
+            className="console-btn estop"
+            onClick={emergencyStop}
+            title="쓰러스터 즉시 차단 · 자율 운항/스테이션 복귀 취소"
+          >
+            <OctagonX size={22} />
+            <span>비상정지</span>
+          </button>
         </div>
       </div>
+
+      <CenterOverlay />
+
+      {plannerOpen && <WaypointPlanner onClose={() => setPlannerOpen(false)} />}
 
       <Minimap />
     </div>

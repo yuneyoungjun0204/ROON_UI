@@ -31,3 +31,6 @@ export const config = {
   initialLat: Number(env.VITE_INITIAL_LAT ?? 36.47655),
   initialLon: Number(env.VITE_INITIAL_LON ?? 127.48375),
 };
+
+/** 스테이션 존 반경 (m) — 시작 위치를 중심으로 한 기지 구역. 3D 원통·미니맵 원 공용. */
+export const STATION_ZONE_RADIUS_M = 45;

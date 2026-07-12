@@ -69,24 +69,32 @@ export function Wake() {
     const fwd = { x: Math.sin(rad), z: -Math.cos(rad) };
     const stb = { x: -fwd.z, z: fwd.x };
 
-    // 속도에 비례해 스폰 (약 10개/초 @ 1 m/s — 풀 크기와 수명에 맞춘 상한)
-    data.spawnAcc += speed * 10 * dt;
+    // 스폰량: 속도 + 쓰러스터 사용량(제자리 회전에서도 후류 거품이 나오게)
+    const thrustP = Math.abs(usv.thrustPort);
+    const thrustS = Math.abs(usv.thrustStbd);
+    const thrustTotal = thrustP + thrustS;
+    data.spawnAcc += (speed * 10 + (thrustTotal / 200) * 5) * dt;
     const { positions, birth, life, size } = data;
     while (data.spawnAcc >= 1) {
       data.spawnAcc -= 1;
+      // 선수 물보라는 전진으로 물살을 가를 때만 — 후진·정지 중엔 선미 후류만
+      const useStern = thrustTotal > 2 && (Math.random() < 0.72 || usv.speed < 0.8);
+      if (!useStern && usv.speed <= 0.8) continue;
       const i = data.next;
       data.next = (i + 1) % COUNT;
       let px: number;
       let pz: number;
-      if (Math.random() < 0.72) {
-        // 선미 프로펠러 후류 — 두 데미헐 각각에서 뿜는다
-        const side = Math.random() < 0.5 ? 1 : -1;
+      if (useStern) {
+        // 선미 프로펠러 후류 — 각 헐의 쓰러스터 출력 비율대로 뿜는다
+        // (한쪽만 추진하면 그쪽 헐 뒤에만 거품이 남는다)
+        const side = Math.random() < thrustS / thrustTotal ? 1 : -1;
+        const use = (side === 1 ? thrustS : thrustP) / 100;
         const lat = side * 2.35 + (Math.random() - 0.5) * 1.2;
         px = usv.x - fwd.x * 7.4 + stb.x * lat;
         pz = usv.z - fwd.z * 7.4 + stb.z * lat;
-        size[i] = 1.6 + Math.random() * 2.0;
+        size[i] = (1.6 + Math.random() * 2.0) * (0.45 + 0.65 * use);
       } else {
-        // 선수 양현 물보라
+        // 선수 양현 물보라 (선체가 물살을 가를 때만)
         const side = Math.random() < 0.5 ? 1 : -1;
         px = usv.x + fwd.x * 5.4 + stb.x * side * (2.4 + Math.random() * 0.6);
         pz = usv.z + fwd.z * 5.4 + stb.z * side * (2.4 + Math.random() * 0.6);
