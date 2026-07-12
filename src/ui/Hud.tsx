@@ -6,7 +6,8 @@ import { Navigation, Gauge, Wifi, WifiOff, Loader2, TerminalSquare } from "lucid
 import { useSimStore } from "../store";
 import { MAX_RUDDER_DEG } from "../sim/usvSim";
 import { config } from "../config";
-import { Minimap } from "./Minimap";
+import { controls, resetControls } from "../sim/controls";
+import { Minimap } from "./SatelliteMinimap";
 
 const MS_TO_KN = 1.943844;
 
@@ -30,18 +31,31 @@ export function Hud() {
   const setThrottle = useSimStore((s) => s.setThrottle);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const { usv: u, setRudderCmd: setR, setThrottle: setT } = useSimStore.getState();
-      if (e.key === "ArrowLeft") setR(u.rudderCmd - 5);
-      else if (e.key === "ArrowRight") setR(u.rudderCmd + 5);
-      else if (e.key === "ArrowUp") setT(u.throttle + 10);
-      else if (e.key === "ArrowDown") setT(u.throttle - 10);
-      else if (e.key === " ") setR(0);
-      else return;
+    // 키를 누르는 "동안" 지령을 램프한다 (실제 반영은 시뮬 루프에서 dt 기반으로).
+    const setHeld = (e: KeyboardEvent, down: boolean) => {
+      const key = e.key.toLowerCase();
+      if (key === "a" || e.key === "ArrowLeft") controls.left = down;
+      else if (key === "d" || e.key === "ArrowRight") controls.right = down;
+      else if (key === "w" || e.key === "ArrowUp") controls.throttleUp = down;
+      else if (key === "s" || e.key === "ArrowDown") controls.throttleDown = down;
+      else if (e.key === " ") {
+        if (down) {
+          useSimStore.getState().setRudderCmd(0);
+          controls.steering = false;
+        }
+      } else return;
       e.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onDown = (e: KeyboardEvent) => setHeld(e, true);
+    const onUp = (e: KeyboardEvent) => setHeld(e, false);
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", resetControls);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", resetControls);
+    };
   }, []);
 
   const sog = usv.speed * MS_TO_KN;
@@ -89,36 +103,53 @@ export function Hud() {
           <div className="control-head">
             <span className="label">RUDDER</span>
             <span className="value">
-              {usv.rudder < -0.05 ? "PORT " : usv.rudder > 0.05 ? "STBD " : ""}
+              {usv.rudder < -0.05 ? (
+                <span className="dir dir-port">PORT</span>
+              ) : usv.rudder > 0.05 ? (
+                <span className="dir dir-stbd">STBD</span>
+              ) : null}
               {Math.abs(usv.rudder).toFixed(0)}°
             </span>
           </div>
-          <input
-            type="range"
-            min={-MAX_RUDDER_DEG}
-            max={MAX_RUDDER_DEG}
-            step={1}
-            value={usv.rudderCmd}
-            onChange={(e) => setRudderCmd(Number(e.target.value))}
-          />
-          <button className="center-btn" onClick={() => setRudderCmd(0)}>
-            타 중앙 (Space)
-          </button>
+          <div className="slider-wrap">
+            {/* 타 중앙(0°) 눈금 */}
+            <div className="tick" style={{ left: "50%" }} />
+            <input
+              type="range"
+              min={-MAX_RUDDER_DEG}
+              max={MAX_RUDDER_DEG}
+              step={1}
+              value={usv.rudderCmd}
+              onChange={(e) => setRudderCmd(Number(e.target.value))}
+            />
+          </div>
+          <div className="control-foot">
+            <button className="center-btn" onClick={() => setRudderCmd(0)}>
+              타 중앙 (Space)
+            </button>
+            <span className="hint">←/→ 또는 A/D</span>
+          </div>
         </div>
         <div className="control">
           <div className="control-head">
             <span className="label">THROTTLE</span>
             <span className="value">{usv.throttle.toFixed(0)}%</span>
           </div>
-          <input
-            type="range"
-            min={-25}
-            max={100}
-            step={5}
-            value={usv.throttle}
-            onChange={(e) => setThrottle(Number(e.target.value))}
-          />
-          <div className="hint">←/→ 타각 · ↑/↓ 스로틀</div>
+          <div className="slider-wrap">
+            {/* 스로틀 0% 눈금 (범위 -25~100 → 20% 지점) */}
+            <div className="tick" style={{ left: "20%" }} />
+            <input
+              type="range"
+              min={-25}
+              max={100}
+              step={5}
+              value={usv.throttle}
+              onChange={(e) => setThrottle(Number(e.target.value))}
+            />
+          </div>
+          <div className="control-foot">
+            <span className="hint">↑/↓ 또는 W/S · 떼면 유지</span>
+          </div>
         </div>
       </div>
 
