@@ -19,6 +19,23 @@ interface ImportMetaEnv {
   readonly VITE_TELEMETRY_INTERVAL_MS?: string;
   readonly VITE_INITIAL_LAT?: string;
   readonly VITE_INITIAL_LON?: string;
+  /** 텔레메트리 경로 mqtt | http (기본 mqtt) */
+  readonly VITE_TELEMETRY_TRANSPORT?: string;
+  /** HTTP 업링크(텔레메트리·카메라) 대상 백엔드 (기본 http://localhost:8000) */
+  readonly VITE_HTTP_API_BASE?: string;
+  /** MQTT 명령 수신 여부 (기본 true) */
+  readonly VITE_ENABLE_MQTT_COMMANDS?: string;
+  /** 카메라 프레임 전송 사용 (기본 true) */
+  readonly VITE_CAMERA_ENABLED?: string;
+  /** 카메라 이름 — URL 경로로 카메라 구분 (기본 fpv / cctv) */
+  readonly VITE_CAMERA_FPV_NAME?: string;
+  readonly VITE_CAMERA_CCTV_NAME?: string;
+  /** 평상시 프레임 전송 주기 ms (기본 10000) */
+  readonly VITE_CAMERA_SLOW_INTERVAL_MS?: string;
+  /** 전송 프레임 해상도·품질 (기본 640 / 360 / 0.6) */
+  readonly VITE_CAMERA_WIDTH?: string;
+  readonly VITE_CAMERA_HEIGHT?: string;
+  readonly VITE_CAMERA_QUALITY?: string;
 }
 
 interface ImportMeta {

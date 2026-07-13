@@ -26,9 +26,16 @@ import { WaypointPlanner } from "./WaypointPlanner";
 import { CompassGauge, SpeedGauge, BatteryGauge, ThrustBars } from "./gauges";
 
 function StatusBadge() {
-  const status = useSimStore((s) => s.mqttStatus);
+  // 활성 텔레메트리 경로의 연결 상태를 보여준다 (http면 HTTP 업링크, 아니면 MQTT)
+  const isHttp = config.telemetryTransport === "http";
+  const status = useSimStore((s) => (isHttp ? s.httpStatus : s.mqttStatus));
+  const proto = isHttp ? "HTTP" : "MQTT";
   const label =
-    status === "connected" ? "MQTT 연결됨" : status === "connecting" ? "연결 중" : "연결 끊김";
+    status === "connected"
+      ? `${proto} 연결됨`
+      : status === "connecting"
+        ? "연결 중"
+        : "연결 끊김";
   const Icon = status === "connected" ? Wifi : status === "connecting" ? Loader2 : WifiOff;
   return (
     <div className={`badge badge-${status}`}>

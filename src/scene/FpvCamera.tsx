@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { WATER_LEVEL_Y } from "../sim/waves";
 import { config } from "../config";
 import { ZONE_LAYER } from "./StationZone";
+import { tickCameraUplink } from "../http/cameraUplink";
 
 /** 장착 위치 (USV 그룹 로컬, 선수 = -z): 데크 앞끝 중앙, 선수 난간(높이 ~2.1m) 바로 위 —
  * 난간·데크가 프레임 하단에 살짝 걸려 1인칭감을 주되 렌즈를 가리지는 않는 높이. */
@@ -31,6 +32,13 @@ cctvCamera.position.set(-70, 42, 70);
 cctvCamera.lookAt(0, WATER_LEVEL, 0);
 // CCTV는 스테이션 존 표시(노란 빛기둥·링)는 보이되, 항로 레이어(1)는 보지 않는다
 cctvCamera.layers.enable(ZONE_LAYER);
+
+/** HTTP 프레임 업링크 대상 카메라 — 이름은 URL 경로로 카메라를 구분한다.
+ * (POST /devices/camera/<name>/frames) 한 토큰으로 두 대를 함께 올린다. */
+export const UPLINK_CAMERAS = [
+  { name: config.cameraFpvName, cam: fpvCamera },
+  { name: config.cameraCctvName, cam: cctvCamera },
+];
 
 /** HUD 카드 영역에 카메라 뷰 하나를 시저 렌더링 */
 function renderScissorView(
@@ -84,6 +92,9 @@ export function FpvRenderPass() {
     renderer.setScissorTest(false);
     renderer.setViewport(0, 0, size.width, size.height);
     renderer.autoClear = true;
+
+    // 3) 카메라 프레임 업링크 — 주기에 맞춰 오프스크린 캡처 후 HTTP POST
+    tickCameraUplink(renderer, scene, UPLINK_CAMERAS, performance.now());
   }, 1);
 
   return null;

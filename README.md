@@ -4,9 +4,11 @@
 
 - **3D 씬**: Three.js + React Three Fiber — 위성 지도·실제 지형(대청호), Gerstner 파도 수면, PBR 조명, 추적 카메라
 - **시뮬레이션**: 타각/스로틀 → 선회율/가감속 → 침로·속력·위경도 적분 (운동학 모델, 60Hz, 3-tau 관성)
-- **MQTT 연동**: 브라우저에서 MQTT over WebSocket으로 브로커에 직접 접속
-  - 발행 `devices/<token>/telemetry` — `{sensor, value, ts}` 형식으로 lat / lon / heading / sog / rudder
-  - 구독 `devices/<id>/commands` — `{channel: "rudder"|"throttle", value}` 명령을 받아 원격 제어
+- **관제 연동 (MQTT / HTTP)**: 텔레메트리를 브로커(MQTT over WebSocket) 또는 백엔드(HTTP POST)로 전송
+  - 텔레메트리 발행 — 위경도·침로·속력·추력·배터리·운항모드 등 16종 (`{sensor, value, ts}`)
+  - 명령 수신 `devices/<id>/commands` — `waypoints`(경로 교체)·`stop`·`homing`·조향·스로틀 등 (`{channel, value}`)
+  - 카메라 프레임 — `fpv`·`cctv` 2대를 한 토큰으로 HTTP 전송 (`POST /devices/camera/<name>/frames`), 라이브 스트리밍 연동
+  - **주고받는 값 전체 정의**: [`docs/PROTOCOL.md`](./docs/PROTOCOL.md)
 
 ```
 USV Simulator(브라우저) ══ ws://9001 ══╗
@@ -55,6 +57,9 @@ VITE_MQTT_PASSWORD=발급받은-비밀번호
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `VITE_VWORLD_KEY` | — | VWorld 인증키 (위성 지도/지형). 없으면 절차적 바다 |
+| `VITE_TELEMETRY_TRANSPORT` | `mqtt` | 텔레메트리 경로 — `mqtt` 또는 `http` |
+| `VITE_HTTP_API_BASE` | `http://localhost:8000` | HTTP 업링크 대상 백엔드 (`transport=http`) |
+| `VITE_ENABLE_MQTT_COMMANDS` | `true` | MQTT 명령 수신 (`false`면 순수 HTTP 센서) |
 | `VITE_MQTT_PROTOCOL` | `ws` | `ws` 또는 `wss` |
 | `VITE_MQTT_HOST` | `localhost` | 브로커 호스트 |
 | `VITE_MQTT_PORT` | ws=`9001`, wss=`8884` | WebSocket 포트 |
@@ -77,7 +82,7 @@ VITE_MQTT_PASSWORD=발급받은-비밀번호
 | **Space** | 타 즉시 중앙 |
 | **마우스 드래그 / 휠** | 카메라 회전 / 줌 |
 
-하단 슬라이더로도 조작할 수 있고, 관제 플랫폼에서 `rudder` / `throttle` 명령을 보내면 원격 제어됩니다.
+하단 슬라이더로도 조작할 수 있고, 관제 플랫폼에서 명령(`waypoints`·`stop`·`homing`·`steer`·`throttle` 등)을 보내면 원격 제어됩니다. 전체 채널은 [`docs/PROTOCOL.md`](./docs/PROTOCOL.md) 참고.
 
 ## 명령어
 

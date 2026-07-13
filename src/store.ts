@@ -24,6 +24,8 @@ export type MqttStatus = "disconnected" | "connecting" | "connected";
 interface SimStore {
   usv: UsvState;
   mqttStatus: MqttStatus;
+  /** HTTP 텔레메트리 업링크 상태 (transport=http일 때만 의미 있음) */
+  httpStatus: MqttStatus;
   waterPolygons: WaterPolygon[];
   /** 마지막으로 수신한 원격 명령 설명 (HUD 표시용) */
   lastCommand: string | null;
@@ -46,6 +48,7 @@ interface SimStore {
   setSteer: (pct: number) => void;
   setThrottle: (pct: number) => void;
   setMqttStatus: (s: MqttStatus) => void;
+  setHttpStatus: (s: MqttStatus) => void;
   setWaterPolygons: (polygons: WaterPolygon[]) => void;
   setLastCommand: (text: string) => void;
   addWaypoint: (p: LocalPoint) => void;
@@ -145,6 +148,7 @@ function replanRoute(
 export const useSimStore = create<SimStore>((set) => ({
   usv: createUsvState(config.initialLat, config.initialLon),
   mqttStatus: "disconnected",
+  httpStatus: "disconnected",
   waterPolygons: [],
   lastCommand: null,
   waypoints: [],
@@ -160,6 +164,7 @@ export const useSimStore = create<SimStore>((set) => ({
   setThrottle: (pct) =>
     set((st) => ({ usv: { ...st.usv, throttle: clampThrottle(pct) } })),
   setMqttStatus: (mqttStatus) => set({ mqttStatus }),
+  setHttpStatus: (httpStatus) => set({ httpStatus }),
   setWaterPolygons: (waterPolygons) => set({ waterPolygons }),
   setLastCommand: (lastCommand) => set({ lastCommand }),
   addWaypoint: (p) =>
