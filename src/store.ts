@@ -213,7 +213,18 @@ export const useSimStore = create<SimStore>((set) => ({
   },
   setAutopilot: (on) =>
     set((st) => {
-      if (!on) return { autopilot: false, returningToStation: false };
+      if (!on) {
+        // 정지 — 자율 운항을 끄면서 지령(스로틀·조향)을 0으로 낮춘다.
+        // 이렇게 안 하면 마지막 자율 지령이 그대로 남아 계속 선회한다(관성).
+        // 웨이포인트는 유지하므로 '출발'로 현재 위치에서 다시 이어갈 수 있다.
+        followState = createFollowState();
+        stoppingAfterArrival = false;
+        return {
+          autopilot: false,
+          returningToStation: false,
+          usv: { ...st.usv, throttle: 0, steer: 0 },
+        };
+      }
       const route = replanRoute(st.usv, st.waypoints, st.reachedCount);
       if (!route) return {};
       return { autopilot: true, route };
