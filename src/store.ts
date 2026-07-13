@@ -238,8 +238,16 @@ export const useSimStore = create<SimStore>((set) => ({
     followState = createFollowState();
     stoppingAfterArrival = false;
     set((st) => ({
-      // 쓰러스터 지령·실제 출력 즉시 차단 (배는 관성으로만 미끄러진다)
-      usv: { ...st.usv, throttle: 0, steer: 0, thrustPort: 0, thrustStbd: 0 },
+      // 쓰러스터 지령·실제 출력 + 속도/요레이트까지 즉시 0 — 관성 미끄러짐 없이 그 자리에서 정지
+      usv: {
+        ...st.usv,
+        throttle: 0,
+        steer: 0,
+        thrustPort: 0,
+        thrustStbd: 0,
+        speed: 0,
+        yawRate: 0,
+      },
       // 예정된 자동 항해(자율 운항·스테이션 복귀) 전부 취소
       waypoints: [],
       route: null,
