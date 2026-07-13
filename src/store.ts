@@ -84,9 +84,8 @@ const STOP_SPEED_MS = 0.15; // 이 속도 이하면 정지 완료로 간주
 
 // ---- 배터리 ----
 const BATTERY_START_PCT = 90;
-// 소모율 5배 (기본 0.05→0.25, 추력 0.3→1.5) — 데모에서 배터리 흐름이 잘 보이게
-const BATTERY_DRAIN_BASE = 0.25; // %/s — 존 밖에 있는 동안의 기본 소모 (항법·센서)
-const BATTERY_DRAIN_THRUST = 1.5; // %/s — 풀추력 시 추가 소모 (좌우 평균 사용률 비례)
+const BATTERY_DRAIN_BASE = 0.05; // %/s — 존 밖에 있는 동안의 기본 소모 (항법·센서)
+const BATTERY_DRAIN_THRUST = 0.3; // %/s — 풀추력 시 추가 소모 (좌우 평균 사용률 비례)
 const BATTERY_CHARGE_RATE = 2.5; // %/s — 스테이션 존 내 급속 충전
 const AUTO_RETURN_BATTERY_PCT = 30; // 이하로 떨어지면 자동 스테이션 복귀
 
@@ -172,8 +171,14 @@ export const useSimStore = create<SimStore>((set) => ({
       if (!isNavigableForRoute(p.x, p.z)) return {}; // 물 밖 클릭은 무시
       const waypoints = [...st.waypoints, p];
       const route = replanRoute(st.usv, waypoints, st.reachedCount);
-      // 웨이포인트를 찍으면 곧바로 자동 항해 시작 (일반 항해 모드)
-      return { waypoints, route, autopilot: route != null, returningToStation: false };
+      // 핀만 추가·경로 미리보기 — 항해는 출발 버튼을 눌러야 시작된다.
+      // (이미 자동 항해 중이면 새 핀을 경로에 이어 붙이고 그대로 항해 유지)
+      return {
+        waypoints,
+        route,
+        autopilot: st.autopilot && route != null,
+        returningToStation: false,
+      };
     }),
   moveWaypoint: (index, p) =>
     set((st) => {

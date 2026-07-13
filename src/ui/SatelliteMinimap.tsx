@@ -1,10 +1,8 @@
-// 위성 미니맵 — 선박 중심 추적, 클릭으로 웨이포인트 추가.
+// 위성 미니맵 — 선박 중심 추적, 보기 전용 (웨이포인트 편집은 플래너에서).
 // 투영·타일·항법 오버레이는 mapShared와 웨이포인트 플래너가 공유한다.
 
 import { useEffect, useRef, useState } from "react";
 import { Plus, Minus } from "lucide-react";
-import { config } from "../config";
-import { lonLatToLocalMeters } from "../geo/webMercator";
 import { useSimStore } from "../store";
 import {
   MAP_ZOOMS,
@@ -16,7 +14,6 @@ import {
   makeToCanvas,
   metersPerPixel,
   project,
-  unproject,
 } from "./mapShared";
 
 const CSS_SIZE = 285;
@@ -32,21 +29,7 @@ function pickScaleBar(metersPerPx: number) {
 export function Minimap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
-  const addWaypoint = useSimStore((s) => s.addWaypoint);
-  const undoWaypoint = useSimStore((s) => s.undoWaypoint);
   const gps = useSimStore((s) => `${s.usv.lat.toFixed(5)}, ${s.usv.lon.toFixed(5)}`);
-
-  /** 캔버스 클릭 위치 → 씬 로컬 미터 좌표 */
-  const clickToLocal = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const dx = e.clientX - rect.left - CSS_SIZE / 2;
-    const dy = e.clientY - rect.top - CSS_SIZE / 2;
-    const { usv } = useSimStore.getState();
-    const zoom = MAP_ZOOMS[zoomIdx];
-    const center = project(usv.lon, usv.lat, zoom);
-    const { lon, lat } = unproject(center.x + dx, center.y + dy, zoom);
-    return lonLatToLocalMeters(lon, lat, config.initialLon, config.initialLat);
-  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -137,19 +120,10 @@ export function Minimap() {
       <canvas
         ref={canvasRef}
         style={{ width: CSS_SIZE, height: CSS_SIZE, borderRadius: 8, display: "block" }}
-        onClick={(e) => addWaypoint(clickToLocal(e))}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          undoWaypoint();
-        }}
-        title="클릭: 웨이포인트 추가 · 우클릭: 마지막 취소"
       />
       <div className="minimap-gps">
         <span className="label">GPS</span>
         <span className="minimap-gps-value">{gps}</span>
-      </div>
-      <div className="minimap-actions">
-        <span className="hint">클릭: 웨이포인트 · 우클릭: 취소 · 상세 편집은 웨이포인트 버튼</span>
       </div>
     </div>
   );

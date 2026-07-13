@@ -3,7 +3,7 @@
 // 우측 도구: 출발/정지 · 마지막 취소 · 전체 삭제 · 스테이션 복귀 · 닫기.
 
 import { useEffect, useRef, useState } from "react";
-import { Anchor, MapPin, Minus, Play, Plus, Square, Trash2, Undo2, X } from "lucide-react";
+import { HelpCircle, MapPin, Minus, Play, Plus, Square, Trash2, Undo2, X } from "lucide-react";
 import { config } from "../config";
 import { lonLatToLocalMeters } from "../geo/webMercator";
 import type { LocalPoint } from "../geo/webMercator";
@@ -21,8 +21,8 @@ import {
   unproject,
 } from "./mapShared";
 
-const MAP_W = 640;
-const MAP_H = 480;
+const MAP_W = 1080;
+const MAP_H = 680;
 const PIN_HIT_RADIUS_PX = 12;
 
 interface DragState {
@@ -44,7 +44,6 @@ export function WaypointPlanner({ onClose }: { onClose: () => void }) {
   const undoWaypoint = useSimStore((s) => s.undoWaypoint);
   const clearWaypoints = useSimStore((s) => s.clearWaypoints);
   const setAutopilot = useSimStore((s) => s.setAutopilot);
-  const returnToStation = useSimStore((s) => s.returnToStation);
   const remaining = waypoints.length - reachedCount;
 
   // ESC로 닫기
@@ -56,11 +55,12 @@ export function WaypointPlanner({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  /** 캔버스 픽셀 → 씬 로컬 미터 */
+  /** 캔버스 픽셀 → 씬 로컬 미터 (CSS 축소 표시를 감안해 논리 좌표로 환산) */
   const canvasToLocal = (clientX: number, clientY: number): LocalPoint => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const dx = clientX - rect.left - MAP_W / 2;
-    const dy = clientY - rect.top - MAP_H / 2;
+    const scale = MAP_W / rect.width;
+    const dx = (clientX - rect.left) * scale - MAP_W / 2;
+    const dy = (clientY - rect.top) * scale - MAP_H / 2;
     const { usv } = useSimStore.getState();
     const zoom = MAP_ZOOMS[zoomIdx];
     const center = project(usv.lon, usv.lat, zoom);
@@ -71,8 +71,9 @@ export function WaypointPlanner({ onClose }: { onClose: () => void }) {
   /** 커서 아래 핀 인덱스 (없으면 -1) */
   const hitTestPin = (clientX: number, clientY: number): number => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const cx = clientX - rect.left;
-    const cy = clientY - rect.top;
+    const scale = MAP_W / rect.width;
+    const cx = (clientX - rect.left) * scale;
+    const cy = (clientY - rect.top) * scale;
     const { usv, waypoints: wps } = useSimStore.getState();
     const zoom = MAP_ZOOMS[zoomIdx];
     const toCanvas = makeToCanvas(project(usv.lon, usv.lat, zoom), zoom, MAP_W, MAP_H);
@@ -165,78 +166,85 @@ export function WaypointPlanner({ onClose }: { onClose: () => void }) {
     <div className="planner-overlay">
       <div className="panel planner">
         <div className="planner-head">
-          <MapPin size={15} />
-          <span className="label">웨이포인트 플래너</span>
-          <div className="minimap-zoom">
-            <button
-              onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
-              disabled={zoomIdx === 0}
-              aria-label="확대"
-            >
-              <Plus size={13} />
-            </button>
-            <button
-              onClick={() => setZoomIdx((i) => Math.min(MAP_ZOOMS.length - 1, i + 1))}
-              disabled={zoomIdx === MAP_ZOOMS.length - 1}
-              aria-label="축소"
-            >
-              <Minus size={13} />
-            </button>
-          </div>
-          <button className="planner-close" onClick={onClose} aria-label="닫기">
+          <MapPin size={16} />
+          <span className="planner-title">웨이포인트 플래너</span>
+          <button className="planner-close" onClick={onClose} aria-label="닫기 (ESC)">
             <X size={16} />
           </button>
         </div>
         <div className="planner-body">
-          <canvas
-            ref={canvasRef}
-            style={{ width: MAP_W, height: MAP_H, borderRadius: 10, display: "block" }}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={() => {
-              dragRef.current = null; // 캔버스 밖으로 나가면 드래그 취소
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              undoWaypoint();
-            }}
-          />
-          <div className="planner-tools">
-            <div className="tool-hint">
-              <p>· 지도 클릭 — 핀 추가 (순서대로)</p>
-              <p>· 핀 드래그 — 위치 이동</p>
-              <p>· 우클릭 — 마지막 핀 취소</p>
+          <div className="planner-map">
+            <canvas
+              ref={canvasRef}
+              style={{ borderRadius: 10, display: "block" }}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={() => {
+                dragRef.current = null; // 캔버스 밖으로 나가면 드래그 취소
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                undoWaypoint();
+              }}
+            />
+            {/* 도움말 — 지도 좌측 상단 ? 아이콘 (호버 시 설명) */}
+            <div className="map-help">
+              <button className="map-overlay-btn" aria-label="도움말">
+                <HelpCircle size={17} />
+              </button>
+              <div className="map-help-pop">
+                <p>· 지도 클릭 — 핀 추가 (순서대로)</p>
+                <p>· 핀 드래그 — 위치 이동</p>
+                <p>· 우클릭 — 마지막 핀 취소</p>
+              </div>
             </div>
-            <div className="tool-status">
-              {waypoints.length === 0
-                ? "웨이포인트 없음"
-                : `WP ${Math.min(reachedCount + 1, waypoints.length)}/${waypoints.length}${autopilot ? " · 항해 중" : ""}`}
+            {/* 확대/축소 — 지도 우측 상단 오버레이 */}
+            <div className="map-zoom">
+              <button
+                className="map-overlay-btn"
+                onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
+                disabled={zoomIdx === 0}
+                aria-label="확대"
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                className="map-overlay-btn"
+                onClick={() => setZoomIdx((i) => Math.min(MAP_ZOOMS.length - 1, i + 1))}
+                disabled={zoomIdx === MAP_ZOOMS.length - 1}
+                aria-label="축소"
+              >
+                <Minus size={16} />
+              </button>
             </div>
-            <button
-              className={`tool-btn ${autopilot ? "active" : ""}`}
-              onClick={() => setAutopilot(!autopilot)}
-              disabled={!autopilot && remaining === 0}
-            >
-              {autopilot ? <Square size={14} /> : <Play size={14} />}
-              {autopilot ? "정지" : "출발"}
-            </button>
-            <button className="tool-btn" onClick={undoWaypoint} disabled={remaining === 0}>
-              <Undo2 size={14} />
-              마지막 취소
-            </button>
-            <button className="tool-btn" onClick={clearWaypoints} disabled={waypoints.length === 0}>
-              <Trash2 size={14} />
-              전체 삭제
-            </button>
-            <button className="tool-btn" onClick={returnToStation}>
-              <Anchor size={14} />
-              스테이션 복귀
-            </button>
-            <button className="tool-btn tool-close" onClick={onClose}>
-              <X size={14} />
-              닫기 (ESC)
-            </button>
+            {/* 출발/취소/삭제 — 지도 우측 하단 오버레이 */}
+            <div className="map-actions">
+              <button
+                className={`tool-sq ${autopilot ? "active" : ""}`}
+                onClick={() => setAutopilot(!autopilot)}
+                disabled={!autopilot && remaining === 0}
+                title={autopilot ? "정지" : "출발"}
+              >
+                {autopilot ? <Square size={20} /> : <Play size={20} />}
+              </button>
+              <button
+                className="tool-sq"
+                onClick={undoWaypoint}
+                disabled={remaining === 0}
+                title="마지막 취소"
+              >
+                <Undo2 size={20} />
+              </button>
+              <button
+                className="tool-sq"
+                onClick={clearWaypoints}
+                disabled={waypoints.length === 0}
+                title="전체 삭제"
+              >
+                <Trash2 size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
