@@ -920,7 +920,6 @@ body {
 
 .minimap canvas {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-  cursor: crosshair;
 }
 
 .minimap-gps {
@@ -935,17 +934,6 @@ body {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: #cfdde8;
-}
-
-.minimap-actions {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  margin-top: 5px;
-}
-
-.minimap-actions .hint {
-  font-size: 10px;
 }
 
 .minimap-head {

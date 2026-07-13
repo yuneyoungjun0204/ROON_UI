@@ -81,9 +81,8 @@ const STOP_SPEED_MS = 0.15; // 이 속도 이하면 정지 완료로 간주
 
 // ---- 배터리 ----
 const BATTERY_START_PCT = 90;
-// 소모율 5배 (기본 0.05→0.25, 추력 0.3→1.5) — 데모에서 배터리 흐름이 잘 보이게
-const BATTERY_DRAIN_BASE = 0.25; // %/s — 존 밖에 있는 동안의 기본 소모 (항법·센서)
-const BATTERY_DRAIN_THRUST = 1.5; // %/s — 풀추력 시 추가 소모 (좌우 평균 사용률 비례)
+const BATTERY_DRAIN_BASE = 0.05; // %/s — 존 밖에 있는 동안의 기본 소모 (항법·센서)
+const BATTERY_DRAIN_THRUST = 0.3; // %/s — 풀추력 시 추가 소모 (좌우 평균 사용률 비례)
 const BATTERY_CHARGE_RATE = 2.5; // %/s — 스테이션 존 내 급속 충전
 const AUTO_RETURN_BATTERY_PCT = 30; // 이하로 떨어지면 자동 스테이션 복귀
 
