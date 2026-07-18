@@ -93,4 +93,17 @@ VITE_MQTT_PASSWORD=발급받은-비밀번호
 | `npm run preview` | 빌드 결과 미리보기 |
 | `npm run lint` | 정적 분석 (oxlint) |
 
+### 서버 시작/중지
+
+```bash
+# 시작
+cd /home/yune/민철_UI/usv-simulator && npm run dev
+
+# 중지 (실행 중인 터미널에서)
+Ctrl + C
+
+# 중지 (다른 터미널에서)
+pkill -f vite
+```
+
 배포 전 검증: `npm run lint && npm run build`
