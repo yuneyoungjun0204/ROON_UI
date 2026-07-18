@@ -1,0 +1,474 @@
+// ─────────────────────────────────────────────────────────────────────────
+// 방어 시뮬레이터 3D 씬
+// - 10대 적군 (빨간색), 3대 아군 (파란색), 1대 모선
+// - 그물 시각화
+// - FollowCam: u1-u3 (아군), a1-a10 (적군)
+// ─────────────────────────────────────────────────────────────────────────
+
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, Sky } from "@react-three/drei";
+import * as THREE from "three";
+import { useDefenseStore, startDefenseLoop } from "../defenseStore";
+import { DEFENSE_CONFIG as C } from "../config/defense";
+import { Mothership } from "./Mothership";
+import { NetMesh } from "./NetMesh";
+import type { ShipState } from "../types/defense";
+import { wavesGlsl } from "../sim/waves";
+
+// ─────────────────────────────────────────────────────────────────────────
+// 카메라 모드 전역 상태
+// ─────────────────────────────────────────────────────────────────────────
+type CameraMode =
+  | { type: "tactical" }
+  | { type: "followAlly"; id: number }
+  | { type: "followEnemy"; id: number };
+
+let cameraMode: CameraMode = { type: "tactical" };
+const cameraModeListeners: Set<() => void> = new Set();
+
+function setCameraMode(mode: CameraMode) {
+  cameraMode = mode;
+  cameraModeListeners.forEach((fn) => fn());
+}
+
+function useCameraMode() {
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const listener = () => forceUpdate({});
+    cameraModeListeners.add(listener);
+    return () => { cameraModeListeners.delete(listener); };
+  }, []);
+  return cameraMode;
+}
+
+// 키보드 입력 처리
+if (typeof window !== "undefined") {
+  let inputBuffer = "";
+  let inputTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  window.addEventListener("keydown", (e) => {
+    // 입력창에 포커스되어 있으면 무시
+    if (document.activeElement?.tagName === "INPUT") return;
+
+    const key = e.key.toLowerCase();
+
+    // ESC로 전술 뷰로 복귀
+    if (key === "escape" || key === "t") {
+      setCameraMode({ type: "tactical" });
+      inputBuffer = "";
+      return;
+    }
+
+    // 숫자나 u/a 입력
+    if (/^[ua0-9]$/.test(key)) {
+      inputBuffer += key;
+
+      if (inputTimeout) clearTimeout(inputTimeout);
+      inputTimeout = setTimeout(() => {
+        inputBuffer = "";
+      }, 1000);
+
+      // u1, u2, u3 - 아군
+      const allyMatch = inputBuffer.match(/u([1-3])$/);
+      if (allyMatch) {
+        setCameraMode({ type: "followAlly", id: parseInt(allyMatch[1]) - 1 });
+        inputBuffer = "";
+        return;
+      }
+
+      // a1-a10 - 적군
+      const enemyMatch = inputBuffer.match(/a(10|[1-9])$/);
+      if (enemyMatch) {
+        setCameraMode({ type: "followEnemy", id: parseInt(enemyMatch[1]) - 1 });
+        inputBuffer = "";
+        return;
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 카메라 컨트롤러
+// ─────────────────────────────────────────────────────────────────────────
+
+function CameraController() {
+  const { camera } = useThree();
+  const controlsRef = useRef<any>(null);
+  const mode = useCameraMode();
+  const offset = C.worldSize / 2;
+  const target = useMemo(() => new THREE.Vector3(), []);
+
+  useEffect(() => {
+    if (mode.type === "tactical") {
+      camera.position.set(0, 4000, 3000);
+      camera.lookAt(0, 0, 0);
+    }
+  }, [mode, camera]);
+
+  useFrame(() => {
+    const state = useDefenseStore.getState();
+
+    if (mode.type === "tactical") {
+      return; // OrbitControls가 처리
+    }
+
+    let ship: ShipState | undefined;
+
+    if (mode.type === "followAlly") {
+      ship = state.allies[mode.id];
+    } else if (mode.type === "followEnemy") {
+      ship = state.enemies[mode.id];
+    }
+
+    if (!ship || !ship.alive) {
+      setCameraMode({ type: "tactical" });
+      return;
+    }
+
+    const sceneX = ship.x - offset;
+    const sceneZ = ship.z - offset;
+    const yaw = (ship.heading * Math.PI) / 180;
+
+    // 선박 뒤쪽에서 따라가는 카메라
+    const camDist = 80;
+    const camHeight = 30;
+
+    target.set(sceneX, 5, sceneZ);
+
+    camera.position.set(
+      sceneX - Math.sin(yaw) * camDist,
+      camHeight,
+      sceneZ + Math.cos(yaw) * camDist
+    );
+    camera.lookAt(target);
+
+    if (controlsRef.current) {
+      controlsRef.current.target.copy(target);
+    }
+  });
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enabled={mode.type === "tactical"}
+      maxPolarAngle={Math.PI / 2.1}
+      minDistance={50}
+      maxDistance={10000}
+      enablePan={true}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 바다 (원본 색상과 동일)
+// ─────────────────────────────────────────────────────────────────────────
+
+const OCEAN_SIZE = C.worldSize * 1.5;
+const OCEAN_SEGMENTS = 150;
+
+const oceanVertexShader = /* glsl */ `
+uniform float uTime;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vWaveH;
+
+${"__WAVES__"}
+
+void main() {
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  float h = waveHeight(wp.xz, uTime);
+  wp.y += h;
+  vWaveH = h;
+
+  float e = 1.2;
+  float hx = waveHeight(wp.xz + vec2(e, 0.0), uTime);
+  float hz = waveHeight(wp.xz + vec2(0.0, e), uTime);
+  vNormal = normalize(vec3(h - hx, e, h - hz));
+  vWorldPos = wp.xyz;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}
+`;
+
+const oceanFragmentShader = /* glsl */ `
+uniform float uTime;
+uniform vec3 uSunDir;
+uniform vec3 uDeepColor;
+uniform vec3 uSeaColor;
+uniform vec3 uSkyColor;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vWaveH;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float detailH(vec2 p, float t) {
+  float h = 0.0;
+  h += vnoise(p * 0.35 + vec2(t * 0.20, t * 0.13)) * 0.60;
+  h += vnoise(p * 0.95 - vec2(t * 0.26, t * 0.17)) * 0.30;
+  h += vnoise(p * 2.30 + vec2(t * 0.34, -t * 0.23)) * 0.12;
+  return h;
+}
+
+void main() {
+  vec2 wp = vWorldPos.xz;
+
+  float camDist = length(cameraPosition - vWorldPos);
+  float detailAmp = 0.8 * (1.0 - smoothstep(60.0, 900.0, camDist));
+  float e = 0.45;
+  float h0 = detailH(wp, uTime);
+  float hx = detailH(wp + vec2(e, 0.0), uTime);
+  float hz = detailH(wp + vec2(0.0, e), uTime);
+  vec3 n = normalize(vNormal + vec3((h0 - hx) * detailAmp, 0.0, (h0 - hz) * detailAmp));
+
+  vec3 viewDir = normalize(cameraPosition - vWorldPos);
+  float facing = max(dot(n, viewDir), 0.0);
+
+  vec3 base = mix(uSeaColor, uDeepColor, facing);
+  float fresnel = pow(1.0 - facing, 3.0);
+  vec3 color = mix(base, uSkyColor, fresnel * 0.85);
+
+  float sunBehind = max(dot(viewDir, -uSunDir), 0.0);
+  color += vec3(0.02, 0.12, 0.11) * sunBehind * smoothstep(0.1, 1.1, vWaveH);
+
+  vec3 halfDir = normalize(uSunDir + viewDir);
+  float ndh = max(dot(n, halfDir), 0.0);
+  color += vec3(1.0, 0.96, 0.82) * (pow(ndh, 260.0) * 1.2 + pow(ndh, 36.0) * 0.12);
+
+  float crest = smoothstep(0.55, 1.15, vWaveH + (h0 - 0.5) * 0.9);
+  color = mix(color, vec3(0.90, 0.95, 0.97), crest * 0.30);
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+function DefenseOcean() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const sunDir = useMemo(() => new THREE.Vector3(50, 62, -38), []);
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uSunDir: { value: sunDir.clone().normalize() },
+      uDeepColor: { value: new THREE.Color("#07304a") },
+      uSeaColor: { value: new THREE.Color("#155e74") },
+      uSkyColor: { value: new THREE.Color("#9dccec") },
+    }),
+    [sunDir],
+  );
+
+  useFrame(({ clock }) => {
+    uniforms.uTime.value = clock.elapsedTime;
+  });
+
+  return (
+    <mesh ref={meshRef} rotation-x={-Math.PI / 2} position={[0, 0, 0]} frustumCulled={false}>
+      <planeGeometry args={[OCEAN_SIZE, OCEAN_SIZE, OCEAN_SEGMENTS, OCEAN_SEGMENTS]} />
+      <shaderMaterial
+        vertexShader={oceanVertexShader.replace("__WAVES__", wavesGlsl())}
+        fragmentShader={oceanFragmentShader}
+        uniforms={uniforms}
+      />
+    </mesh>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 전술 선박
+// ─────────────────────────────────────────────────────────────────────────
+
+function TacticalShip({ state, team, selected }: {
+  state: ShipState;
+  team: "ally" | "enemy";
+  selected?: boolean;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const offset = C.worldSize / 2;
+
+  const isAlly = team === "ally";
+  const primaryColor = isAlly ? 0x2266ff : 0xff2222;
+  const markerColor = isAlly ? 0x00aaff : 0xff4444;
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g) return;
+
+    g.visible = state.alive;
+    if (!state.alive) return;
+
+    g.position.set(state.x - offset, 0, state.z - offset);
+    g.rotation.y = -(state.heading * Math.PI) / 180;
+  });
+
+  if (!state.alive) return null;
+
+  return (
+    <group ref={groupRef}>
+      {/* 선체 */}
+      <mesh position={[0, 3, 0]} castShadow>
+        <boxGeometry args={[30, 6, 80]} />
+        <meshStandardMaterial color={primaryColor} />
+      </mesh>
+
+      {/* 선수 */}
+      <mesh position={[0, 3, -45]} castShadow>
+        <coneGeometry args={[15, 25, 4]} />
+        <meshStandardMaterial color={primaryColor} />
+      </mesh>
+
+      {/* 브릿지 */}
+      <mesh position={[0, 10, 10]} castShadow>
+        <boxGeometry args={[20, 8, 25]} />
+        <meshStandardMaterial color={0xeeeeee} />
+      </mesh>
+
+      {/* 마커 폴 */}
+      <mesh position={[0, 80, 0]}>
+        <cylinderGeometry args={[3, 3, 160, 8]} />
+        <meshBasicMaterial color={markerColor} />
+      </mesh>
+
+      {/* 상단 구체 */}
+      <mesh position={[0, 170, 0]}>
+        <sphereGeometry args={[20]} />
+        <meshBasicMaterial color={markerColor} />
+      </mesh>
+
+      {/* 선택 링 */}
+      {selected && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1, 0]}>
+          <ringGeometry args={[55, 70, 32]} />
+          <meshBasicMaterial color={0x00ff00} transparent opacity={0.6} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 조명, 클러스터
+// ─────────────────────────────────────────────────────────────────────────
+
+function Lighting() {
+  return (
+    <>
+      <ambientLight intensity={0.3} />
+      <directionalLight
+        position={[50, 62, -38]}
+        intensity={1.5}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-far={15000}
+        shadow-camera-left={-8000}
+        shadow-camera-right={8000}
+        shadow-camera-top={8000}
+        shadow-camera-bottom={-8000}
+      />
+      <hemisphereLight args={[0xcfe6f8, 0x3a5f6e, 0.5]} />
+    </>
+  );
+}
+
+function ClusterOverlay() {
+  const clusters = useDefenseStore((s) => s.clusters);
+  const offset = C.worldSize / 2;
+
+  return (
+    <group>
+      {clusters.map((cluster) => (
+        <group
+          key={cluster.id}
+          position={[cluster.centroidX - offset, 10, cluster.centroidZ - offset]}
+        >
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[Math.max(100, cluster.spread * 0.8), Math.max(120, cluster.spread), 32]} />
+            <meshBasicMaterial
+              color={[0xff4444, 0xff8800, 0xffff00, 0xff44ff][cluster.id % 4]}
+              transparent
+              opacity={0.3}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 메인 씬
+// ─────────────────────────────────────────────────────────────────────────
+
+function DefenseSceneContent() {
+  const allies = useDefenseStore((s) => s.allies);
+  const enemies = useDefenseStore((s) => s.enemies);
+  const mothership = useDefenseStore((s) => s.mothership);
+  const selectedAlly = useDefenseStore((s) => s.selectedAlly);
+
+  return (
+    <>
+      <CameraController />
+      <Lighting />
+      <Sky sunPosition={[50, 62, -38]} />
+      <fog attach="fog" args={[0x9dccec, 2000, 15000]} />
+
+      {/* 바다 (원본 색상) */}
+      <DefenseOcean />
+
+      {/* 모선 */}
+      <Mothership state={mothership} />
+
+      {/* 아군 (3대) - 파란색 */}
+      {allies.map((ally) => (
+        <TacticalShip
+          key={`ally-${ally.id}`}
+          state={ally}
+          team="ally"
+          selected={ally.id === selectedAlly}
+        />
+      ))}
+
+      {/* 적 (10대) - 빨간색 */}
+      {enemies.map((enemy) => (
+        <TacticalShip
+          key={`enemy-${enemy.id}`}
+          state={enemy}
+          team="enemy"
+        />
+      ))}
+
+      {/* 그물 */}
+      <NetMesh />
+
+      {/* 클러스터 표시 */}
+      <ClusterOverlay />
+    </>
+  );
+}
+
+export function DefenseScene() {
+  useEffect(() => {
+    const cleanup = startDefenseLoop();
+    return cleanup;
+  }, []);
+
+  return (
+    <Canvas
+      shadows
+      camera={{ fov: 55, near: 0.5, far: 25000 }}
+      gl={{ antialias: true }}
+    >
+      <DefenseSceneContent />
+    </Canvas>
+  );
+}
