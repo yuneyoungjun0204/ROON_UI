@@ -305,11 +305,37 @@ function stepAlly(ally: AllyState, dt: number): AllyState {
 
   // 도착 판정
   if (dist < 10) {
+    const completedWp = ally.route[0];
     const newRoute = ally.route.slice(1);
+    const nextWp = newRoute[0];
+
+    // 그물 전개 자동 관리
+    let newPainting = ally.painting;
+    let newPaintDist = ally.paintDist;
+    let newNetsRemaining = ally.netsRemaining;
+
+    // 현재 WP가 paint 구간이고 painting 중이면 → 구간 완료
+    if (completedWp.paint && ally.painting) {
+      // paint 구간 종료 (다음이 paint가 아니거나 경로 끝)
+      if (!nextWp?.paint) {
+        newPainting = false;
+        newPaintDist = 0;
+      }
+    }
+
+    // 다음 WP가 paint 구간이면 → painting 시작
+    if (nextWp?.paint && !ally.painting && ally.netsRemaining > 0) {
+      newPainting = true;
+      newPaintDist = 0;
+    }
+
     return {
       ...ally,
       route: newRoute,
       speed: newRoute.length === 0 ? 0 : ally.speed,
+      painting: newPainting,
+      paintDist: newPaintDist,
+      netsRemaining: newNetsRemaining,
     };
   }
 

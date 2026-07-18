@@ -94,14 +94,24 @@ export function useDefenseMqtt(): void {
           if (match) {
             const allyId = parseInt(match[1], 10);
             const waypoints = data.waypoints || [];
+            const netMask = data.net_mask || data.netMask || [];  // 그물 전개 구간
 
             // GPS 또는 SIM 좌표를 route로 변환
-            const route = waypoints.map((wp: { x?: number; z?: number; lat?: number; lon?: number }) => {
+            const route = waypoints.map((wp: {
+              x?: number;
+              z?: number;
+              lat?: number;
+              lon?: number;
+              paint?: boolean;
+            }, idx: number) => {
+              // paint 속성: wp.paint > netMask[idx] > false
+              const paint = wp.paint ?? (netMask[idx] === true || netMask[idx] === 1) ?? false;
+
               if (wp.x !== undefined && wp.z !== undefined) {
-                return { x: wp.x, z: wp.z, paint: false, started: false, active: true };
+                return { x: wp.x, z: wp.z, paint, started: false, active: true };
               } else if (wp.lat !== undefined && wp.lon !== undefined) {
                 const sim = gpsToSim(wp.lat, wp.lon, motherLat, motherLon);
-                return { x: sim.x, z: sim.z, paint: false, started: false, active: true };
+                return { x: sim.x, z: sim.z, paint, started: false, active: true };
               }
               return null;
             }).filter(Boolean);
@@ -109,7 +119,8 @@ export function useDefenseMqtt(): void {
             if (route.length > 0) {
               // 아군 경로 설정
               store.setAllyRoute(allyId, route);
-              console.log(`[DefenseMQTT] Ally ${allyId}: ${route.length}개 웨이포인트 수신`);
+              const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
+              console.log(`[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간)`);
             }
           }
         }
