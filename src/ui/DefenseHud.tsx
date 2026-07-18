@@ -5,13 +5,15 @@
 // - 아군 상태
 // - 제어 버튼
 // - 카메라 조작 안내
-// - 버드아이 뷰 미니맵
+// - 버드아이 뷰 미니맵 (클러스터, 할당, 레이캐스트)
+// - 지휘관 판단 패널
 // ─────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef } from "react";
 import { useDefenseStore } from "../defenseStore";
 import { DEFENSE_CONFIG as C, FORMATION_NAMES } from "../config/defense";
 import type { EnemyFormation, AllyState } from "../types/defense";
+import { CommanderPanel } from "./CommanderPanel";
 import "./DefenseHud.css";
 
 /** 버드아이 뷰 미니맵 */
@@ -232,6 +234,9 @@ export function DefenseHud() {
           />
         ))}
       </div>
+
+      {/* 지휘관 판단 패널 (MobRobGPT 스타일) */}
+      <CommanderPanel />
 
       {/* 버드아이 뷰 미니맵 */}
       <BattlefieldMinimap />

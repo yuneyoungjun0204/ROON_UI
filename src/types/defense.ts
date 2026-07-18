@@ -92,3 +92,21 @@ export type EnemyFormation =
 
 /** 시뮬레이션 모드 */
 export type SimMode = "usv" | "defense";
+
+/** 아군 할당 정보 (MobRobGPT 스타일) */
+export interface Assignment {
+  allyId: number;
+  clusterId: number;  // -1 = 미할당
+  status: "active" | "reserve" | "stopped";
+}
+
+/** 지휘관 상태 (MobRobGPT run_commander_ui.py 스타일) */
+export interface CommanderState {
+  model: string;
+  status: "ready" | "calling" | "error";
+  command: string;
+  clusters: (ClusterInfo & { bearing?: number; color?: string })[];
+  assignments: Assignment[];
+  rationale: string;
+  lastUpdate: number;
+}

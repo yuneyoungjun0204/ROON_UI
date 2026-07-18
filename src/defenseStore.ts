@@ -15,6 +15,7 @@ import type {
   ClusterInfo,
   SimStats,
   EnemyFormation,
+  CommanderState,
 } from "./types/defense";
 import { spawnEnemies, spawnAllies } from "./sim/formations";
 import {
@@ -34,6 +35,7 @@ interface DefenseStore {
   netGrid: boolean[][];
   clusters: ClusterInfo[];
   stats: SimStats;
+  commanderState: CommanderState;
 
   // ── 제어 ──
   running: boolean;
@@ -47,10 +49,12 @@ interface DefenseStore {
   tick: (dt: number) => void;
   selectAlly: (id: number) => void;
   setAllyTarget: (allyId: number, x: number, z: number) => void;
+  setAllyRoute: (allyId: number, route: { x: number; z: number; paint: boolean; started: boolean; active: boolean }[]) => void;
   startNetDeploy: (allyId: number) => void;
   stopNetDeploy: (allyId: number) => void;
   toggleRunning: () => void;
   setFormation: (formation: EnemyFormation) => void;
+  setCommanderState: (state: Partial<CommanderState>) => void;
 }
 
 /** 초기 통계 */
@@ -71,6 +75,17 @@ const initialMothership: MothershipState = {
   radius: C.mothership.radius,
 };
 
+/** 초기 지휘관 상태 (MobRobGPT 스타일) */
+const initialCommanderState: CommanderState = {
+  model: "oneway_ros2 (RL)",
+  status: "ready",
+  command: "모든 적군 포획",
+  clusters: [],
+  assignments: [],
+  rationale: "ROS2 브릿지 대기 중...",
+  lastUpdate: 0,
+};
+
 export const useDefenseStore = create<DefenseStore>((set, get) => ({
   // ── 초기 상태 ──
   allies: spawnAllies(),
@@ -80,6 +95,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   netGrid: createEmptyNetGrid(),
   clusters: [],
   stats: { ...initialStats },
+  commanderState: { ...initialCommanderState },
   running: false,
   selectedAlly: 0,
   formation: "diversionary",
@@ -98,6 +114,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       netGrid: createEmptyNetGrid(),
       clusters: [],
       stats: { ...initialStats },
+      commanderState: { ...initialCommanderState },
       running: false,
       selectedAlly: 0,
       formation: f,
@@ -223,6 +240,16 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     }));
   },
 
+  setAllyRoute: (allyId, route) => {
+    set((state) => ({
+      allies: state.allies.map((ally) =>
+        ally.id === allyId
+          ? { ...ally, route }
+          : ally
+      ),
+    }));
+  },
+
   startNetDeploy: (allyId) => {
     set((state) => ({
       allies: state.allies.map((ally) =>
@@ -246,6 +273,11 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   toggleRunning: () => set((state) => ({ running: !state.running })),
 
   setFormation: (formation) => set({ formation }),
+
+  setCommanderState: (state) =>
+    set((prev) => ({
+      commanderState: { ...prev.commanderState, ...state },
+    })),
 }));
 
 /** 아군 이동 업데이트 (단순화) */

@@ -1,0 +1,303 @@
+/* 지휘관 판단 패널 스타일 */
+/* MobRobGPT run_commander_ui.py 스타일 */
+
+.commander-panel {
+  position: absolute;
+  top: 20px;
+  right: 220px;  /* 미니맵 왼쪽 */
+  width: 280px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  background: rgba(13, 27, 42, 0.95);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(100, 200, 255, 0.3);
+  font-family: 'Segoe UI', sans-serif;
+  color: #eceff4;
+  font-size: 12px;
+}
+
+.commander-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.commander-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.commander-panel::-webkit-scrollbar-thumb {
+  background: rgba(100, 200, 255, 0.3);
+  border-radius: 3px;
+}
+
+/* 헤더 */
+.commander-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.2);
+  margin-bottom: 12px;
+}
+
+.model-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-info .label {
+  color: #88aacc;
+  font-size: 11px;
+}
+
+.model-name {
+  color: #4FC3F7;
+  font-weight: 600;
+}
+
+.status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.status.ready {
+  color: #81C784;
+  background: rgba(129, 199, 132, 0.15);
+}
+
+.status.calling {
+  color: #FFB74D;
+  background: rgba(255, 183, 77, 0.15);
+  animation: pulse 1s infinite;
+}
+
+.status.error {
+  color: #EF5350;
+  background: rgba(239, 83, 80, 0.15);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 섹션 공통 */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #88ccff;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+}
+
+/* 명령 입력 */
+.command-section {
+  margin-bottom: 14px;
+}
+
+.command-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.command-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid rgba(100, 200, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 20, 40, 0.6);
+  color: #eceff4;
+  font-size: 11px;
+}
+
+.command-input:focus {
+  outline: none;
+  border-color: #4FC3F7;
+}
+
+.command-submit {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: #0066cc;
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.command-submit:hover {
+  background: #0088ff;
+}
+
+.current-command {
+  font-size: 11px;
+  color: #88aacc;
+  font-style: italic;
+  padding: 4px 8px;
+  background: rgba(0, 40, 60, 0.4);
+  border-radius: 4px;
+}
+
+/* 클러스터 현황 */
+.clusters-section {
+  margin-bottom: 14px;
+}
+
+.clusters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.no-clusters {
+  color: #668899;
+  font-style: italic;
+  font-size: 11px;
+}
+
+.cluster-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 40, 60, 0.4);
+  border-radius: 4px;
+  border-left: 3px solid #FF8A65;
+  font-size: 11px;
+}
+
+.cluster-id {
+  font-weight: 600;
+  color: #fff;
+  min-width: 24px;
+}
+
+.cluster-count {
+  color: #EF5350;
+  font-weight: 500;
+}
+
+.cluster-bearing {
+  color: #88aacc;
+}
+
+.cluster-threat {
+  margin-left: auto;
+  color: #FFB74D;
+  font-size: 10px;
+}
+
+/* 투입 배분 */
+.assignments-section {
+  margin-bottom: 14px;
+}
+
+.assignment-summary {
+  font-size: 11px;
+  color: #88aacc;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 40, 60, 0.4);
+  border-radius: 4px;
+}
+
+.assignments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assignment-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(0, 40, 60, 0.5);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.assignment-item.active {
+  border: 1px solid rgba(129, 199, 132, 0.4);
+}
+
+.assignment-item.reserve {
+  border: 1px solid rgba(255, 183, 77, 0.4);
+  opacity: 0.8;
+}
+
+.assignment-item.stopped {
+  border: 1px solid rgba(239, 83, 80, 0.4);
+  opacity: 0.5;
+}
+
+.ally-tag {
+  color: #42A5F5;
+  font-weight: 600;
+}
+
+.arrow {
+  color: #668899;
+  font-size: 10px;
+}
+
+.cluster-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.status-tag {
+  color: #888;
+  font-size: 10px;
+  font-style: italic;
+}
+
+/* 판단 근거 */
+.rationale-section {
+  margin-bottom: 14px;
+}
+
+.rationale-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #aabbcc;
+  padding: 8px;
+  background: rgba(0, 40, 60, 0.4);
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+/* TF 겹침 범례 */
+.legend-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(100, 200, 255, 0.2);
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #88aacc;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
