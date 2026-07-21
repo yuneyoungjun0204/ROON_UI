@@ -185,7 +185,7 @@ export function spawnAllies(): AllyState[] {
       id: i,
       x: startX + i * C.allySideSpacing,
       z: rowZ,
-      heading: 0,               // 북쪽을 향함 (모선 방향)
+      heading: 180,             // 남쪽을 향함 (모선 반대 방향으로 시작)
       speed: 0,
       yawRate: 0,
       thrustPort: 0,

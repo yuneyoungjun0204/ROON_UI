@@ -99,12 +99,16 @@ function CameraController() {
   const offset = C.worldSize / 2;
   const target = useMemo(() => new THREE.Vector3(), []);
 
+  // 스케일에 맞춘 카메라 거리
+  const tacticalHeight = C.worldSize * 0.8;
+  const tacticalDist = C.worldSize * 0.6;
+
   useEffect(() => {
     if (mode.type === "tactical") {
-      camera.position.set(0, 4000, 3000);
+      camera.position.set(0, tacticalHeight, tacticalDist);
       camera.lookAt(0, 0, 0);
     }
-  }, [mode, camera]);
+  }, [mode, camera, tacticalHeight, tacticalDist]);
 
   useFrame(() => {
     const state = useDefenseStore.getState();
@@ -130,11 +134,11 @@ function CameraController() {
     const sceneZ = ship.z - offset;
     const yaw = (ship.heading * Math.PI) / 180;
 
-    // 선박 뒤쪽에서 따라가는 카메라
-    const camDist = 80;
-    const camHeight = 30;
+    // 선박 뒤쪽에서 따라가는 카메라 (스케일 적용)
+    const camDist = C.render.shipLength * 1.5;
+    const camHeight = C.render.shipLength * 0.5;
 
-    target.set(sceneX, 5, sceneZ);
+    target.set(sceneX, C.render.shipHeight, sceneZ);
 
     camera.position.set(
       sceneX - Math.sin(yaw) * camDist,
@@ -153,8 +157,8 @@ function CameraController() {
       ref={controlsRef}
       enabled={mode.type === "tactical"}
       maxPolarAngle={Math.PI / 2.1}
-      minDistance={50}
-      maxDistance={10000}
+      minDistance={C.worldSize * 0.01}
+      maxDistance={C.worldSize * 2}
       enablePan={true}
     />
   );
@@ -299,6 +303,9 @@ function TacticalShip({ state, team, selected }: {
   const primaryColor = isAlly ? 0x2266ff : 0xff2222;
   const markerColor = isAlly ? 0x00aaff : 0xff4444;
 
+  // 스케일된 렌더링 값
+  const { shipLength, shipWidth, shipHeight, markerHeight, markerSphere } = C.render;
+
   useFrame(() => {
     const g = groupRef.current;
     if (!g) return;
@@ -315,39 +322,39 @@ function TacticalShip({ state, team, selected }: {
   return (
     <group ref={groupRef}>
       {/* 선체 */}
-      <mesh position={[0, 3, 0]} castShadow>
-        <boxGeometry args={[30, 6, 80]} />
+      <mesh position={[0, shipHeight / 2, 0]} castShadow>
+        <boxGeometry args={[shipWidth, shipHeight, shipLength]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
 
       {/* 선수 */}
-      <mesh position={[0, 3, -45]} castShadow>
-        <coneGeometry args={[15, 25, 4]} />
+      <mesh position={[0, shipHeight / 2, -shipLength * 0.56]} castShadow>
+        <coneGeometry args={[shipWidth / 2, shipLength * 0.3, 4]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
 
       {/* 브릿지 */}
-      <mesh position={[0, 10, 10]} castShadow>
-        <boxGeometry args={[20, 8, 25]} />
+      <mesh position={[0, shipHeight * 1.5, shipLength * 0.12]} castShadow>
+        <boxGeometry args={[shipWidth * 0.66, shipHeight * 1.3, shipLength * 0.3]} />
         <meshStandardMaterial color={0xeeeeee} />
       </mesh>
 
       {/* 마커 폴 */}
-      <mesh position={[0, 80, 0]}>
-        <cylinderGeometry args={[3, 3, 160, 8]} />
+      <mesh position={[0, markerHeight / 2, 0]}>
+        <cylinderGeometry args={[markerSphere * 0.15, markerSphere * 0.15, markerHeight, 8]} />
         <meshBasicMaterial color={markerColor} />
       </mesh>
 
       {/* 상단 구체 */}
-      <mesh position={[0, 170, 0]}>
-        <sphereGeometry args={[20]} />
+      <mesh position={[0, markerHeight + markerSphere * 0.5, 0]}>
+        <sphereGeometry args={[markerSphere]} />
         <meshBasicMaterial color={markerColor} />
       </mesh>
 
       {/* 선택 링 */}
       {selected && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1, 0]}>
-          <ringGeometry args={[55, 70, 32]} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
+          <ringGeometry args={[shipLength * 0.7, shipLength * 0.85, 32]} />
           <meshBasicMaterial color={0x00ff00} transparent opacity={0.6} side={THREE.DoubleSide} />
         </mesh>
       )}
@@ -360,6 +367,7 @@ function TacticalShip({ state, team, selected }: {
 // ─────────────────────────────────────────────────────────────────────────
 
 function Lighting() {
+  const shadowRange = C.worldSize * 1.5;
   return (
     <>
       <ambientLight intensity={0.3} />
@@ -368,11 +376,11 @@ function Lighting() {
         intensity={1.5}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={15000}
-        shadow-camera-left={-8000}
-        shadow-camera-right={8000}
-        shadow-camera-top={8000}
-        shadow-camera-bottom={-8000}
+        shadow-camera-far={shadowRange * 2}
+        shadow-camera-left={-shadowRange}
+        shadow-camera-right={shadowRange}
+        shadow-camera-top={shadowRange}
+        shadow-camera-bottom={-shadowRange}
       />
       <hemisphereLight args={[0xcfe6f8, 0x3a5f6e, 0.5]} />
     </>
@@ -382,16 +390,21 @@ function Lighting() {
 function ClusterOverlay() {
   const clusters = useDefenseStore((s) => s.clusters);
   const offset = C.worldSize / 2;
+  const minRingSize = C.render.shipLength * 2;
 
   return (
     <group>
       {clusters.map((cluster) => (
         <group
           key={cluster.id}
-          position={[cluster.centroidX - offset, 10, cluster.centroidZ - offset]}
+          position={[cluster.centroidX - offset, C.render.shipHeight * 2, cluster.centroidZ - offset]}
         >
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[Math.max(100, cluster.spread * 0.8), Math.max(120, cluster.spread), 32]} />
+            <ringGeometry args={[
+              Math.max(minRingSize, cluster.spread * 0.8),
+              Math.max(minRingSize * 1.2, cluster.spread),
+              32
+            ]} />
             <meshBasicMaterial
               color={[0xff4444, 0xff8800, 0xffff00, 0xff44ff][cluster.id % 4]}
               transparent
@@ -420,7 +433,7 @@ function DefenseSceneContent() {
       <CameraController />
       <Lighting />
       <Sky sunPosition={[50, 62, -38]} />
-      <fog attach="fog" args={[0x9dccec, 2000, 15000]} />
+      <fog attach="fog" args={[0x9dccec, C.worldSize * 0.5, C.worldSize * 3]} />
 
       {/* 바다 (원본 색상) */}
       <DefenseOcean />
@@ -465,7 +478,7 @@ export function DefenseScene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 55, near: 0.5, far: 25000 }}
+      camera={{ fov: 55, near: C.worldSize * 0.001, far: C.worldSize * 5 }}
       gl={{ antialias: true }}
     >
       <DefenseSceneContent />
