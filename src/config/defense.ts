@@ -19,7 +19,7 @@ export const DEFENSE_CONFIG = {
 
   // ── 적 ──
   nEnemies: 10,
-  enemySpeed: 216,        // m/s (54 × 4배 = 216)
+  enemySpeed: 108,        // m/s (54 × 2배 = 108)
   enemyMaxTurn: 5,        // deg/s
   enemyWeaveAmp: 14,      // 위빙 진폭 (deg)
   enemyWeaveFreq: 1 / 32, // 위빙 주파수 (Hz)
@@ -29,7 +29,7 @@ export const DEFENSE_CONFIG = {
 
   // ── 아군 ──
   nAllies: 3,
-  allySpeed: 144,         // m/s (36 × 4배 = 144)
+  allySpeed: 72,          // m/s (36 × 2배 = 72)
   allyMaxTurn: 8,         // deg/s
   allyRowGap: 550,        // 모선 후미 거리
   allySideSpacing: 330,   // 아군 간 횡간격
