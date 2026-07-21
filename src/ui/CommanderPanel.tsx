@@ -139,24 +139,6 @@ export function CommanderPanel() {
         <div className="rationale-text">{commanderState.rationale}</div>
       </div>
 
-      {/* TF 겹침 범례 */}
-      <div className="legend-section">
-        <div className="section-title">TF 겹침 범례</div>
-        <div className="legend-items">
-          <div className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: "#00E676" }}></span>
-            <span>1개 TF = 감시 영역</span>
-          </div>
-          <div className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: "#FFB74D" }}></span>
-            <span>2개 TF 겹침 = 진입 가능</span>
-          </div>
-          <div className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: "#EF5350" }}></span>
-            <span>3개+ TF 겹침 = 적극 진입</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

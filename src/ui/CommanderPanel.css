@@ -275,29 +275,3 @@
   white-space: pre-wrap;
 }
 
-/* TF 겹침 범례 */
-.legend-section {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(100, 200, 255, 0.2);
-}
-
-.legend-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  color: #88aacc;
-}
-
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-}
