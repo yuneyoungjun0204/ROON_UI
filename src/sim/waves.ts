@@ -2,6 +2,8 @@
 // 바다 셰이더(GLSL)와 선박의 흔들림(JS)이 같은 파라미터를 공유해
 // 배가 실제로 파도 위에 떠 있는 것처럼 보이게 한다.
 
+import { SCALE } from "../config/defense";
+
 export interface Wave {
   amplitude: number; // m
   wavelength: number; // m
@@ -20,11 +22,12 @@ const d2 = norm(-0.4, 1);
 const d3 = norm(0.8, -0.5);
 const d4 = norm(0.25, 1);
 
+// 원본 파도 값 (12.6km 맵 기준) → 스케일 적용
 export const WAVES: Wave[] = [
-  { amplitude: 0.5, wavelength: 140, speed: 0.7, dirX: d4[0], dirZ: d4[1] },
-  { amplitude: 0.55, wavelength: 60, speed: 1.1, dirX: d1[0], dirZ: d1[1] },
-  { amplitude: 0.3, wavelength: 27, speed: 1.6, dirX: d2[0], dirZ: d2[1] },
-  { amplitude: 0.16, wavelength: 11, speed: 2.4, dirX: d3[0], dirZ: d3[1] },
+  { amplitude: 0.5 * SCALE, wavelength: 140 * SCALE, speed: 0.7, dirX: d4[0], dirZ: d4[1] },
+  { amplitude: 0.55 * SCALE, wavelength: 60 * SCALE, speed: 1.1, dirX: d1[0], dirZ: d1[1] },
+  { amplitude: 0.3 * SCALE, wavelength: 27 * SCALE, speed: 1.6, dirX: d2[0], dirZ: d2[1] },
+  { amplitude: 0.16 * SCALE, wavelength: 11 * SCALE, speed: 2.4, dirX: d3[0], dirZ: d3[1] },
 ];
 
 /** 월드 좌표 (x, z)와 시각 t(초)의 해수면 높이(m) */
@@ -42,7 +45,7 @@ export function waveHeight(x: number, z: number, t: number): number {
  * DEM이 물가를 수면보다 살짝 높게 잡아 지형과 물 사이가 떠 보이는 문제를,
  * 수면 전체를 올려 물가 턱을 덮는 방식으로 해결한다.
  * 물 메시·배·카메라가 모두 이 값을 기준으로 뜬다. */
-export const WATER_LEVEL_Y = 1.1;
+export const WATER_LEVEL_Y = 1.1 * SCALE;
 
 // ── Gerstner 파도 (shipmulator 이식) ─────────────────────────────
 // 긴 스웰 2개만 정점에서 변위(앨리어싱 방지), 짧은 잔물결은 수면 셰이더의
@@ -64,9 +67,10 @@ export const WAVE_TIME_SCALE = 0.55;
 
 // 잔잔한 챱(chop) — 큰 스웰 없이 낮고 짧은 물결 두 방향.
 // 진폭이 작아 수면 격자를 성기게 잡아도 앨리어싱이 없다(성능 확보).
+// 스케일 적용
 export const GERSTNER_WAVES: GerstnerWave[] = [
-  { dirX: 1.0, dirZ: 0.3, amplitude: 0.14, wavelength: 60, steepness: 0.28 },
-  { dirX: 0.5, dirZ: 0.85, amplitude: 0.1, wavelength: 34, steepness: 0.3 },
+  { dirX: 1.0, dirZ: 0.3, amplitude: 0.14 * SCALE, wavelength: 60 * SCALE, steepness: 0.28 },
+  { dirX: 0.5, dirZ: 0.85, amplitude: 0.1 * SCALE, wavelength: 34 * SCALE, steepness: 0.3 },
 ];
 
 function gerstnerConstants(w: GerstnerWave) {
