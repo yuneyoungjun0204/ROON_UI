@@ -127,14 +127,19 @@ export function useDefenseMqtt(): void {
               const distToFirst = ally ?
                 Math.hypot(first.x - ally.x, first.z - ally.z).toFixed(2) : 'N/A';
 
-              // 기존 경로와 비교
+              // 기존 경로와 비교 (좌표 변경 OR paint 플래그 변경)
               const prevRoute = ally?.route || [];
-              const isNewRoute = prevRoute.length !== route.length ||
+              const coordChanged = prevRoute.length !== route.length ||
                 (prevRoute.length > 0 && route.length > 0 &&
                   (Math.abs(prevRoute[0].x - route[0].x) > 0.1 ||
                    Math.abs(prevRoute[0].z - route[0].z) > 0.1));
+              // ★ paint 플래그 변경 감지 (그물 전개 명령)
+              const paintChanged = prevRoute.length === route.length &&
+                prevRoute.some((wp: { paint: boolean }, i: number) =>
+                  wp.paint !== route[i]?.paint);
+              const isNewRoute = coordChanged || paintChanged;
 
-              // 경로 업데이트 (새 경로일 때만)
+              // 경로 업데이트 (좌표 또는 paint 변경 시)
               if (isNewRoute) {
                 store.setAllyRoute(allyId, route);
                 const paintFlags = route.map((r: { paint: boolean }, i: number) =>
@@ -242,6 +247,14 @@ export function useDefenseMqtt(): void {
       });
 
       // 전체 상태 (일괄) - 효율적인 전송
+      // ★ netGrid를 압축 형태로 포함 (설치된 그물 셀 좌표 목록)
+      const installedCells: [number, number][] = [];
+      state.netGrid.forEach((row, i) => {
+        row.forEach((cell, j) => {
+          if (cell) installedCells.push([i, j]);
+        });
+      });
+
       const fullState = {
         allies: state.allies.map((a) => {
           const gps = simToGps(a.x, a.z, motherLat, motherLon);
@@ -257,6 +270,8 @@ export function useDefenseMqtt(): void {
           lat: motherLat,
           lon: motherLon,
         },
+        netInstalled: installedCells,  // ★ 설치된 그물 셀 목록
+        gridSize: state.netGrid.length,
         step: state.step,
         running: state.running,
         done: state.done,
