@@ -117,16 +117,32 @@ export function useDefenseMqtt(): void {
             }).filter(Boolean);
 
             if (route.length > 0) {
-              // 아군 경로 설정
-              store.setAllyRoute(allyId, route);
-              const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
-              const first = route[0];
-              const last = route[route.length - 1];
-              console.log(
-                `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간) ` +
-                `first=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
-                `last=(${last.x.toFixed(2)}, ${last.z.toFixed(2)})`
-              );
+              // 기존 경로와 비교하여 변경된 경우에만 업데이트
+              const currentAlly = store.allies.find(a => a.id === allyId);
+              const currentRoute = currentAlly?.route || [];
+
+              // 좌표 변경 여부 확인 (0.1m 허용 오차)
+              const isSameRoute = currentRoute.length === route.length &&
+                route.every((wp: { x: number; z: number }, idx: number) => {
+                  const cur = currentRoute[idx];
+                  return cur &&
+                    Math.abs(wp.x - cur.x) < 0.1 &&
+                    Math.abs(wp.z - cur.z) < 0.1;
+                });
+
+              if (!isSameRoute) {
+                // 경로가 변경됨 - 업데이트
+                store.setAllyRoute(allyId, route);
+                const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
+                const first = route[0];
+                const last = route[route.length - 1];
+                console.log(
+                  `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간) ` +
+                  `first=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
+                  `last=(${last.x.toFixed(2)}, ${last.z.toFixed(2)})`
+                );
+              }
+              // else: 경로 동일 - 스킵 (기존 진행 상태 유지)
             }
           }
         }
