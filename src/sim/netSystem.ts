@@ -57,7 +57,9 @@ export function updateNetPainting(
   const dz = ally.z - prevZ;
   const dist = Math.hypot(dx, dz);
 
-  if (dist < 0.1) return { netGrid, netSegment: null, newPaintDist: ally.paintDist };
+  // 최소 이동 거리 (셀 크기의 1%)
+  const minDist = cellSize * 0.01;
+  if (dist < minDist) return { netGrid, netSegment: null, newPaintDist: ally.paintDist };
 
   // 수직 방향 (그물 폭 방향)
   const perpX = -dz / dist;
