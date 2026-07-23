@@ -134,6 +134,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     // ── 1. 적 이동 + 포획/돌파 체크 ──
     let captures = state.stats.captures;
     let breaches = state.stats.breaches;
+    let newNetGrid = state.netGrid;  // 포획 체크 전에 선언
 
     const movedEnemies = state.enemies.map((enemy) => {
       if (!enemy.alive) return enemy;
@@ -144,7 +145,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       if (!enemy.alive) return enemy;
 
       // 포획 체크
-      if (checkCapture(enemy, newNetGrid)) {  // 새로 칠해진 netGrid 사용
+      if (checkCapture(enemy, newNetGrid)) {
         captures++;
         console.log(`[tick] ★ 적 ${enemy.id} 포획! 위치=(${enemy.x.toFixed(2)}, ${enemy.z.toFixed(2)})`);
         return { ...enemy, alive: false };
@@ -161,7 +162,6 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     });
 
     // ── 2. 아군 이동 + 그물 전개 ──
-    let newNetGrid = state.netGrid;
     const newNets = [...state.nets];
     let netsUsed = state.stats.netsUsed;
 
