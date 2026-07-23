@@ -424,6 +424,66 @@ function ClusterOverlay() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 웨이포인트 마커
+// ─────────────────────────────────────────────────────────────────────────
+
+function WaypointMarkers() {
+  const allies = useDefenseStore((s) => s.allies);
+  const offset = C.worldSize / 2;
+  const wpSize = C.render.shipLength * 0.3;
+
+  // 아군별 색상
+  const allyColors = [0xff4444, 0xff8844, 0xffaa44];  // 빨강, 주황, 노랑
+
+  return (
+    <group name="waypoints">
+      {allies.map((ally) =>
+        ally.route.map((wp, wpIdx) => {
+          const sceneX = wp.x - offset;
+          const sceneZ = wp.z - offset;
+          const color = allyColors[ally.id % allyColors.length];
+          const isNetWp = wp.paint;
+
+          return (
+            <group key={`wp-${ally.id}-${wpIdx}`} position={[sceneX, wpSize, sceneZ]}>
+              {/* WP 구체 */}
+              <mesh>
+                <sphereGeometry args={[wpSize, 16, 16]} />
+                <meshBasicMaterial
+                  color={color}
+                  transparent
+                  opacity={0.8}
+                />
+              </mesh>
+
+              {/* 그물 WP는 링으로 표시 */}
+              {isNetWp && (
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -wpSize * 0.5, 0]}>
+                  <ringGeometry args={[wpSize * 1.2, wpSize * 1.5, 16]} />
+                  <meshBasicMaterial color={0x00ff00} transparent opacity={0.6} side={THREE.DoubleSide} />
+                </mesh>
+              )}
+
+              {/* WP 번호 폴 */}
+              <mesh position={[0, wpSize * 2, 0]}>
+                <cylinderGeometry args={[wpSize * 0.1, wpSize * 0.1, wpSize * 3, 8]} />
+                <meshBasicMaterial color={color} />
+              </mesh>
+
+              {/* WP 인덱스 표시 (상단 구체) */}
+              <mesh position={[0, wpSize * 4, 0]}>
+                <sphereGeometry args={[wpSize * 0.4]} />
+                <meshBasicMaterial color={wpIdx === 0 ? 0xffffff : color} />
+              </mesh>
+            </group>
+          );
+        })
+      )}
+    </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 메인 씬
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -467,6 +527,9 @@ function DefenseSceneContent() {
 
       {/* 그물 */}
       <NetMesh />
+
+      {/* 웨이포인트 마커 */}
+      <WaypointMarkers />
 
       {/* 클러스터 표시 */}
       <ClusterOverlay />

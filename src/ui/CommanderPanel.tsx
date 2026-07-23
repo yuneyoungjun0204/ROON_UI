@@ -133,12 +133,64 @@ export function CommanderPanel() {
         </div>
       </div>
 
+      {/* 웨이포인트 현황 */}
+      <WaypointSection />
+
       {/* 판단 근거 */}
       <div className="rationale-section">
         <div className="section-title">판단 근거 (rationale)</div>
         <div className="rationale-text">{commanderState.rationale}</div>
       </div>
 
+    </div>
+  );
+}
+
+/** 웨이포인트 현황 컴포넌트 */
+function WaypointSection() {
+  const allies = useDefenseStore((s) => s.allies);
+  const allyColors = ["#FF6B6B", "#FF8C42", "#FFD93D"];
+
+  const totalWps = allies.reduce((sum, a) => sum + a.route.length, 0);
+  const netWps = allies.reduce(
+    (sum, a) => sum + a.route.filter(wp => wp.paint).length,
+    0
+  );
+
+  return (
+    <div className="waypoints-section">
+      <div className="section-title">
+        웨이포인트 현황
+        <span className="wp-count">({totalWps}개 / 그물 {netWps}개)</span>
+      </div>
+      <div className="waypoints-list">
+        {allies.map((ally) => (
+          <div key={ally.id} className="ally-waypoints">
+            <div
+              className="ally-header"
+              style={{ borderLeftColor: allyColors[ally.id % allyColors.length] }}
+            >
+              <span className="ally-name">아군 #{ally.id}</span>
+              <span className="wp-info">
+                {ally.route.length > 0 ? `${ally.route.length} WP` : "경로 없음"}
+              </span>
+            </div>
+            {ally.route.length > 0 && (
+              <div className="wp-items">
+                {ally.route.map((wp, idx) => (
+                  <div key={idx} className={`wp-item ${wp.paint ? "net-wp" : ""}`}>
+                    <span className="wp-idx">{idx + 1}</span>
+                    <span className="wp-coords">
+                      ({wp.x.toFixed(1)}, {wp.z.toFixed(1)})
+                    </span>
+                    {wp.paint && <span className="wp-net-tag">NET</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -260,6 +260,100 @@
   font-style: italic;
 }
 
+/* 웨이포인트 현황 */
+.waypoints-section {
+  margin-bottom: 14px;
+}
+
+.waypoints-section .section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.waypoints-section .wp-count {
+  font-weight: normal;
+  color: #668899;
+  font-size: 10px;
+}
+
+.waypoints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ally-waypoints {
+  background: rgba(0, 40, 60, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ally-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-left: 3px solid #FF6B6B;
+  background: rgba(0, 20, 40, 0.5);
+}
+
+.ally-name {
+  font-weight: 600;
+  color: #4FC3F7;
+  font-size: 11px;
+}
+
+.wp-info {
+  color: #88aacc;
+  font-size: 10px;
+}
+
+.wp-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.wp-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 60, 80, 0.4);
+  border-radius: 3px;
+  font-size: 10px;
+  border: 1px solid rgba(100, 200, 255, 0.2);
+}
+
+.wp-item.net-wp {
+  border-color: rgba(0, 255, 100, 0.4);
+  background: rgba(0, 80, 40, 0.4);
+}
+
+.wp-idx {
+  font-weight: 600;
+  color: #FF8A65;
+  min-width: 14px;
+  text-align: center;
+}
+
+.wp-coords {
+  color: #88aacc;
+  font-family: monospace;
+  font-size: 9px;
+}
+
+.wp-net-tag {
+  padding: 0 4px;
+  background: #00aa55;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 2px;
+}
+
 /* 판단 근거 */
 .rationale-section {
   margin-bottom: 14px;
