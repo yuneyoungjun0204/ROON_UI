@@ -286,9 +286,11 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
 
 /** 아군 이동 업데이트 (단순화) */
 function stepAlly(ally: AllyState, dt: number): AllyState {
-  // 디버그: 100프레임마다 상태 출력
-  if (Math.random() < 0.01) {
-    console.log(`[stepAlly] Ally ${ally.id}: pos=(${ally.x.toFixed(1)}, ${ally.z.toFixed(1)}), route=${ally.route.length}개 WP`);
+  // 디버그: 경로 있을 때만 100프레임마다 상태 출력
+  if (ally.route.length > 0 && Math.random() < 0.02) {
+    const wp = ally.route[0];
+    const dist = Math.hypot(wp.x - ally.x, wp.z - ally.z);
+    console.log(`[stepAlly] Ally ${ally.id}: pos=(${ally.x.toFixed(2)}, ${ally.z.toFixed(2)}) → WP(${wp.x.toFixed(2)}, ${wp.z.toFixed(2)}), dist=${dist.toFixed(2)}m, speed=${ally.speed.toFixed(3)}, heading=${ally.heading.toFixed(1)}°`);
   }
 
   if (ally.route.length === 0) {
@@ -312,10 +314,12 @@ function stepAlly(ally: AllyState, dt: number): AllyState {
   const dz = target.z - ally.z;
   const dist = Math.hypot(dx, dz);
 
-  // 도착 판정
-  if (dist < 10) {
+  // 도착 판정 (스케일 적용: 선박 길이 기준)
+  const arrivalDist = C.render.shipLength * 2;  // 선박 길이의 2배
+  if (dist < arrivalDist) {
     const completedWp = ally.route[0];
     const newRoute = ally.route.slice(1);
+    console.log(`[stepAlly] Ally ${ally.id}: WP 도달! (${completedWp.x.toFixed(2)}, ${completedWp.z.toFixed(2)}) → 남은 WP: ${newRoute.length}개`);
     const nextWp = newRoute[0];
 
     // 그물 전개 자동 관리
@@ -446,5 +450,16 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   Object.defineProperty(window, "__defense", {
     configurable: true,
     get: () => useDefenseStore.getState(),
+  });
+
+  // 초기화 시 설정값 출력
+  console.log("[DefenseStore] 초기화됨");
+  console.log(`  worldSize: ${C.worldSize.toFixed(2)}m`);
+  console.log(`  allySpeed: ${C.allySpeed.toFixed(4)}m/s`);
+  console.log(`  shipLength: ${C.render.shipLength.toFixed(4)}m`);
+  console.log(`  arrivalDist: ${(C.render.shipLength * 2).toFixed(4)}m`);
+  const allies = useDefenseStore.getState().allies;
+  allies.forEach(a => {
+    console.log(`  Ally ${a.id}: pos=(${a.x.toFixed(2)}, ${a.z.toFixed(2)})`);
   });
 }

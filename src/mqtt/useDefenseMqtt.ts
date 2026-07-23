@@ -120,10 +120,6 @@ export function useDefenseMqtt(): void {
               // 아군 현재 위치 확인
               const ally = store.allies.find(a => a.id === allyId);
               const allyPos = ally ? `(${ally.x.toFixed(2)}, ${ally.z.toFixed(2)})` : 'N/A';
-
-              // 경로 업데이트
-              store.setAllyRoute(allyId, route);
-              const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
               const first = route[0];
               const last = route[route.length - 1];
 
@@ -131,11 +127,23 @@ export function useDefenseMqtt(): void {
               const distToFirst = ally ?
                 Math.hypot(first.x - ally.x, first.z - ally.z).toFixed(2) : 'N/A';
 
-              console.log(
-                `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 ` +
-                `| 현재위치=${allyPos} | 첫WP=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
-                `| 거리=${distToFirst}m | running=${store.running}`
-              );
+              // 기존 경로와 비교
+              const prevRoute = ally?.route || [];
+              const isNewRoute = prevRoute.length !== route.length ||
+                (prevRoute.length > 0 && route.length > 0 &&
+                  (Math.abs(prevRoute[0].x - route[0].x) > 0.1 ||
+                   Math.abs(prevRoute[0].z - route[0].z) > 0.1));
+
+              // 경로 업데이트 (새 경로일 때만)
+              if (isNewRoute) {
+                store.setAllyRoute(allyId, route);
+                const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
+                console.log(
+                  `[DefenseMQTT] Ally ${allyId}: ★ 새 경로 ${route.length}개 WP ` +
+                  `| 현재=${allyPos} → 첫WP=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
+                  `| 거리=${distToFirst}m | paint=${paintCount}개 | running=${store.running}`
+                );
+              }
             }
           }
         }
