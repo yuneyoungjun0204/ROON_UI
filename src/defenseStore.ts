@@ -144,14 +144,16 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       if (!enemy.alive) return enemy;
 
       // 포획 체크
-      if (checkCapture(enemy, state.netGrid)) {
+      if (checkCapture(enemy, newNetGrid)) {  // 새로 칠해진 netGrid 사용
         captures++;
+        console.log(`[tick] ★ 적 ${enemy.id} 포획! 위치=(${enemy.x.toFixed(2)}, ${enemy.z.toFixed(2)})`);
         return { ...enemy, alive: false };
       }
 
       // 돌파 체크
       if (checkBreach(enemy, mothership)) {
         breaches++;
+        console.log(`[tick] ⚠ 적 ${enemy.id} 돌파! 위치=(${enemy.x.toFixed(2)}, ${enemy.z.toFixed(2)})`);
         return { ...enemy, alive: false };
       }
 
@@ -177,11 +179,20 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
         const { netGrid: updatedGrid, netSegment, newPaintDist } = updateNetPainting(
           updated, prevX, prevZ, newNetGrid, dt
         );
+
+        // 격자가 변경되었는지 확인
+        const oldFilledCount = newNetGrid.flat().filter(Boolean).length;
+        const newFilledCount = updatedGrid.flat().filter(Boolean).length;
+        if (newFilledCount > oldFilledCount && Math.random() < 0.1) {
+          console.log(`[tick] Ally ${updated.id}: 그물 칠하기 ${oldFilledCount} → ${newFilledCount} 셀`);
+        }
+
         newNetGrid = updatedGrid;
 
         if (netSegment) {
           newNets.push(netSegment);
           netsUsed++;
+          console.log(`[tick] Ally ${updated.id}: ★ 그물 세그먼트 완성! 총 ${newNets.length}개`);
           // 그물 완성 - 전개 종료
           return {
             ...updated,
@@ -327,19 +338,21 @@ function stepAlly(ally: AllyState, dt: number): AllyState {
     let newPaintDist = ally.paintDist;
     let newNetsRemaining = ally.netsRemaining;
 
-    // 현재 WP가 paint 구간이고 painting 중이면 → 구간 완료
-    if (completedWp.paint && ally.painting) {
-      // paint 구간 종료 (다음이 paint가 아니거나 경로 끝)
-      if (!nextWp?.paint) {
-        newPainting = false;
-        newPaintDist = 0;
-      }
-    }
-
-    // 다음 WP가 paint 구간이면 → painting 시작
-    if (nextWp?.paint && !ally.painting && ally.netsRemaining > 0) {
+    // 현재 WP가 paint 구간이면 → 다음 WP로 이동하면서 그물 전개 시작
+    // (completedWp.paint=true는 "이 WP에서 다음 WP까지 그물을 치라"는 의미)
+    if (completedWp.paint && !ally.painting && ally.netsRemaining > 0) {
       newPainting = true;
       newPaintDist = 0;
+      console.log(`[stepAlly] Ally ${ally.id}: ★ 그물 전개 시작! netsRemaining=${ally.netsRemaining}`);
+    }
+
+    // 다음 WP가 paint가 아니거나 경로 끝이면 → 그물 전개 종료
+    if (ally.painting && (!nextWp || !nextWp.paint)) {
+      // 그물 세그먼트 완성 (painting 중이었다면)
+      newPainting = false;
+      newPaintDist = 0;
+      newNetsRemaining = ally.netsRemaining - 1;
+      console.log(`[stepAlly] Ally ${ally.id}: ★ 그물 전개 완료! 남은 그물=${newNetsRemaining}`);
     }
 
     return {

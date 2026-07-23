@@ -5,7 +5,7 @@
 // 3. 격자 오버레이: 칠해진 셀 표시
 // ─────────────────────────────────────────────────────────────────────────
 
-import { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useDefenseStore } from "../defenseStore";
 import { DEFENSE_CONFIG as C } from "../config/defense";
@@ -84,8 +84,9 @@ function DeployingNet({ ally }: { ally: AllyState }) {
 function GridOverlay({ netGrid }: { netGrid: boolean[][] }) {
   const cellSize = C.worldSize / C.gridSize;
   const offset = C.worldSize / 2;
+  const meshRef = useRef<THREE.InstancedMesh>(null);
 
-  // 칠해진 셀 수집 (성능을 위해 인스턴싱 사용)
+  // 칠해진 셀 수집
   const filledCells = useMemo(() => {
     const cells: [number, number][] = [];
     for (let gz = 0; gz < C.gridSize; gz++) {
@@ -98,42 +99,42 @@ function GridOverlay({ netGrid }: { netGrid: boolean[][] }) {
     return cells;
   }, [netGrid]);
 
-  // 인스턴스 행렬 계산
-  const instanceData = useMemo(() => {
-    const matrices = new Float32Array(filledCells.length * 16);
+  // 인스턴스 행렬 업데이트
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || filledCells.length === 0) return;
+
     const tempMatrix = new THREE.Matrix4();
+    const rotation = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
 
     filledCells.forEach(([gx, gz], i) => {
       const x = (gx + 0.5) * cellSize - offset;
       const z = (gz + 0.5) * cellSize - offset;
 
-      tempMatrix.makeRotationX(-Math.PI / 2);
+      tempMatrix.copy(rotation);
       tempMatrix.setPosition(x, 0.2, z);
-      tempMatrix.toArray(matrices, i * 16);
+      mesh.setMatrixAt(i, tempMatrix);
     });
 
-    return matrices;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.count = filledCells.length;
   }, [filledCells, cellSize, offset]);
 
-  if (filledCells.length === 0) return null;
+  // 최대 셀 수 (격자 전체)
+  const maxCells = C.gridSize * C.gridSize;
 
   return (
     <instancedMesh
-      args={[undefined, undefined, filledCells.length]}
+      ref={meshRef}
+      args={[undefined, undefined, maxCells]}
       frustumCulled={false}
     >
       <planeGeometry args={[cellSize * 0.9, cellSize * 0.9]} />
       <meshBasicMaterial
         color={0x00ff00}
         transparent
-        opacity={0.25}
+        opacity={0.4}
         side={THREE.DoubleSide}
-      />
-      <instancedBufferAttribute
-        attach="instanceMatrix"
-        array={instanceData}
-        count={filledCells.length}
-        itemSize={16}
       />
     </instancedMesh>
   );

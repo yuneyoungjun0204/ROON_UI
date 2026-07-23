@@ -130,9 +130,11 @@ export function evadeNet(
 
   const headingRad = (enemy.heading * Math.PI) / 180;
   const lookDist = C.enemyEvadeLook;
+  const cellSize = C.worldSize / C.gridSize;
 
-  // 전방 탐지
-  for (let d = 50; d < lookDist; d += 30) {
+  // 전방 탐지 (스케일 적용)
+  const stepSize = cellSize * 2;  // 셀 크기의 2배씩 탐지
+  for (let d = stepSize; d < lookDist; d += stepSize) {
     const checkX = enemy.x + Math.sin(headingRad) * d;
     const checkZ = enemy.z - Math.cos(headingRad) * d;
     const [gx, gz] = worldToGrid(checkX, checkZ);

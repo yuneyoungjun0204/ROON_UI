@@ -137,11 +137,13 @@ export function useDefenseMqtt(): void {
               // 경로 업데이트 (새 경로일 때만)
               if (isNewRoute) {
                 store.setAllyRoute(allyId, route);
-                const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
+                const paintFlags = route.map((r: { paint: boolean }, i: number) =>
+                  `WP${i}:${r.paint ? '🎨' : '○'}`
+                ).join(' ');
                 console.log(
                   `[DefenseMQTT] Ally ${allyId}: ★ 새 경로 ${route.length}개 WP ` +
                   `| 현재=${allyPos} → 첫WP=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
-                  `| 거리=${distToFirst}m | paint=${paintCount}개 | running=${store.running}`
+                  `| 거리=${distToFirst}m | ${paintFlags} | running=${store.running}`
                 );
               }
             }
