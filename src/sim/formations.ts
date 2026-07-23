@@ -181,11 +181,21 @@ export function spawnAllies(): AllyState[] {
   const startX = center - ((C.nAllies - 1) * C.allySideSpacing) / 2;
 
   for (let i = 0; i < C.nAllies; i++) {
+    const allyX = startX + i * C.allySideSpacing;
+
+    // 테스트용 초기 경로: 적 방향으로 이동 후 그물 설치
+    const testRoute = [
+      // WP0: 적 방향으로 전진 (paint=true → 여기서 WP1까지 그물 설치)
+      { x: allyX, z: center - C.worldSize * 0.2, paint: true, started: false, active: true },
+      // WP1: 그물 종료 지점
+      { x: allyX, z: center - C.worldSize * 0.35, paint: false, started: false, active: true },
+    ];
+
     allies.push({
       id: i,
-      x: startX + i * C.allySideSpacing,
+      x: allyX,
       z: rowZ,
-      heading: 180,             // 남쪽을 향함 (모선 반대 방향으로 시작)
+      heading: 0,               // 북쪽(적 방향)을 향함
       speed: 0,
       yawRate: 0,
       thrustPort: 0,
@@ -197,7 +207,7 @@ export function spawnAllies(): AllyState[] {
       painting: false,
       paintDist: 0,
       assignedCluster: -1,
-      route: [],
+      route: testRoute,         // 테스트용 경로
     });
   }
 
