@@ -430,55 +430,87 @@ function ClusterOverlay() {
 function WaypointMarkers() {
   const allies = useDefenseStore((s) => s.allies);
   const offset = C.worldSize / 2;
-  const wpSize = C.render.shipLength * 0.3;
+  // 마커 크기를 더 키움 (선박 길이의 1.5배)
+  const wpSize = C.render.shipLength * 1.5;
 
-  // 아군별 색상
-  const allyColors = [0xff4444, 0xff8844, 0xffaa44];  // 빨강, 주황, 노랑
+  // 아군별 색상 (더 밝은 색으로)
+  const allyColors = [0xff6666, 0xffaa66, 0xffcc66];  // 밝은 빨강, 주황, 노랑
 
   return (
     <group name="waypoints">
-      {allies.map((ally) =>
-        ally.route.map((wp, wpIdx) => {
-          const sceneX = wp.x - offset;
-          const sceneZ = wp.z - offset;
-          const color = allyColors[ally.id % allyColors.length];
-          const isNetWp = wp.paint;
+      {allies.map((ally) => {
+        const color = allyColors[ally.id % allyColors.length];
+        const routePoints: THREE.Vector3[] = [];
 
-          return (
-            <group key={`wp-${ally.id}-${wpIdx}`} position={[sceneX, wpSize, sceneZ]}>
-              {/* WP 구체 */}
-              <mesh>
-                <sphereGeometry args={[wpSize, 16, 16]} />
-                <meshBasicMaterial
-                  color={color}
-                  transparent
-                  opacity={0.8}
-                />
-              </mesh>
+        // 경로 포인트 수집 (연결선용)
+        ally.route.forEach((wp) => {
+          routePoints.push(new THREE.Vector3(wp.x - offset, wpSize * 0.5, wp.z - offset));
+        });
 
-              {/* 그물 WP는 링으로 표시 */}
-              {isNetWp && (
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -wpSize * 0.5, 0]}>
-                  <ringGeometry args={[wpSize * 1.2, wpSize * 1.5, 16]} />
-                  <meshBasicMaterial color={0x00ff00} transparent opacity={0.6} side={THREE.DoubleSide} />
-                </mesh>
-              )}
+        return (
+          <group key={`ally-wps-${ally.id}`}>
+            {/* 경로 연결선 */}
+            {routePoints.length > 1 && (
+              <line>
+                <bufferGeometry>
+                  <bufferAttribute
+                    attach="attributes-position"
+                    count={routePoints.length}
+                    array={new Float32Array(routePoints.flatMap(p => [p.x, p.y, p.z]))}
+                    itemSize={3}
+                  />
+                </bufferGeometry>
+                <lineBasicMaterial color={color} linewidth={3} transparent opacity={0.6} />
+              </line>
+            )}
 
-              {/* WP 번호 폴 */}
-              <mesh position={[0, wpSize * 2, 0]}>
-                <cylinderGeometry args={[wpSize * 0.1, wpSize * 0.1, wpSize * 3, 8]} />
-                <meshBasicMaterial color={color} />
-              </mesh>
+            {/* 웨이포인트 마커 */}
+            {ally.route.map((wp, wpIdx) => {
+              const sceneX = wp.x - offset;
+              const sceneZ = wp.z - offset;
+              const isNetWp = wp.paint;
 
-              {/* WP 인덱스 표시 (상단 구체) */}
-              <mesh position={[0, wpSize * 4, 0]}>
-                <sphereGeometry args={[wpSize * 0.4]} />
-                <meshBasicMaterial color={wpIdx === 0 ? 0xffffff : color} />
-              </mesh>
-            </group>
-          );
-        })
-      )}
+              return (
+                <group key={`wp-${ally.id}-${wpIdx}`} position={[sceneX, wpSize, sceneZ]}>
+                  {/* WP 구체 */}
+                  <mesh>
+                    <sphereGeometry args={[wpSize * 0.5, 16, 16]} />
+                    <meshBasicMaterial
+                      color={color}
+                      transparent
+                      opacity={0.9}
+                    />
+                  </mesh>
+
+                  {/* 그물 WP는 큰 링으로 강조 */}
+                  {isNetWp && (
+                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+                      <ringGeometry args={[wpSize * 0.7, wpSize, 16]} />
+                      <meshBasicMaterial color={0x00ff44} transparent opacity={0.8} side={THREE.DoubleSide} />
+                    </mesh>
+                  )}
+
+                  {/* 지면 투영 링 */}
+                  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -wpSize + 0.05, 0]}>
+                    <ringGeometry args={[wpSize * 0.3, wpSize * 0.5, 16]} />
+                    <meshBasicMaterial color={color} transparent opacity={0.4} side={THREE.DoubleSide} />
+                  </mesh>
+
+                  {/* WP 인덱스 폴 + 번호 */}
+                  <mesh position={[0, wpSize, 0]}>
+                    <cylinderGeometry args={[wpSize * 0.05, wpSize * 0.05, wpSize * 1.5, 8]} />
+                    <meshBasicMaterial color={color} />
+                  </mesh>
+                  <mesh position={[0, wpSize * 1.8, 0]}>
+                    <sphereGeometry args={[wpSize * 0.25]} />
+                    <meshBasicMaterial color={wpIdx === 0 ? 0xffffff : color} />
+                  </mesh>
+                </group>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }

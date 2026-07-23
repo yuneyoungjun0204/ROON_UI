@@ -60,9 +60,9 @@ export function useDefenseMqtt(): void {
     });
     clientRef.current = client;
 
-    // 모선 GPS 기준점 (대청호)
-    const motherLat = 36.47655;
-    const motherLon = 127.48375;
+    // 모선 GPS 기준점 (남해 매물도 - MobRobGPT와 일치)
+    const motherLat = 34.625;
+    const motherLon = 128.52;
 
     client.on("connect", () => {
       console.log("[DefenseMQTT] 연결됨");
@@ -120,7 +120,13 @@ export function useDefenseMqtt(): void {
               // 아군 경로 설정
               store.setAllyRoute(allyId, route);
               const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
-              console.log(`[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간)`);
+              const first = route[0];
+              const last = route[route.length - 1];
+              console.log(
+                `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간) ` +
+                `first=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
+                `last=(${last.x.toFixed(2)}, ${last.z.toFixed(2)})`
+              );
             }
           }
         }
