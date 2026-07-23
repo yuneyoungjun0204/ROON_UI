@@ -241,6 +241,10 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   },
 
   setAllyRoute: (allyId, route) => {
+    console.log(`[DefenseStore] setAllyRoute(${allyId}): ${route.length}개 WP 설정`);
+    if (route.length > 0) {
+      console.log(`  첫 WP: (${route[0].x.toFixed(2)}, ${route[0].z.toFixed(2)})`);
+    }
     set((state) => ({
       allies: state.allies.map((ally) =>
         ally.id === allyId
@@ -282,6 +286,11 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
 
 /** 아군 이동 업데이트 (단순화) */
 function stepAlly(ally: AllyState, dt: number): AllyState {
+  // 디버그: 100프레임마다 상태 출력
+  if (Math.random() < 0.01) {
+    console.log(`[stepAlly] Ally ${ally.id}: pos=(${ally.x.toFixed(1)}, ${ally.z.toFixed(1)}), route=${ally.route.length}개 WP`);
+  }
+
   if (ally.route.length === 0) {
     // 경로 없음 - 정지 (관성 감속)
     const decel = 2; // m/s²

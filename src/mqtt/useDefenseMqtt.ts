@@ -117,15 +117,24 @@ export function useDefenseMqtt(): void {
             }).filter(Boolean);
 
             if (route.length > 0) {
-              // 경로 업데이트 (비교 로직 제거 - MobRobGPT에서 변경 시에만 발행)
+              // 아군 현재 위치 확인
+              const ally = store.allies.find(a => a.id === allyId);
+              const allyPos = ally ? `(${ally.x.toFixed(2)}, ${ally.z.toFixed(2)})` : 'N/A';
+
+              // 경로 업데이트
               store.setAllyRoute(allyId, route);
               const paintCount = route.filter((r: { paint: boolean }) => r.paint).length;
               const first = route[0];
               const last = route[route.length - 1];
+
+              // 첫 WP까지 거리 계산
+              const distToFirst = ally ?
+                Math.hypot(first.x - ally.x, first.z - ally.z).toFixed(2) : 'N/A';
+
               console.log(
-                `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 (그물 ${paintCount}구간) ` +
-                `first=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
-                `last=(${last.x.toFixed(2)}, ${last.z.toFixed(2)})`
+                `[DefenseMQTT] Ally ${allyId}: ${route.length}개 WP 수신 ` +
+                `| 현재위치=${allyPos} | 첫WP=(${first.x.toFixed(2)}, ${first.z.toFixed(2)}) ` +
+                `| 거리=${distToFirst}m | running=${store.running}`
               );
             }
           }
