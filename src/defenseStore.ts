@@ -43,6 +43,7 @@ interface DefenseStore {
   formation: EnemyFormation;
   step: number;
   done: boolean;
+  bridgeMode: boolean;  // 브릿지 모드 (외부 데이터 수신)
 
   // ── 액션 ──
   reset: (formation?: EnemyFormation) => void;
@@ -55,6 +56,19 @@ interface DefenseStore {
   toggleRunning: () => void;
   setFormation: (formation: EnemyFormation) => void;
   setCommanderState: (state: Partial<CommanderState>) => void;
+  // 브릿지 모드 전용
+  setBridgeMode: (enabled: boolean) => void;
+  setExternalState: (state: {
+    allies: AllyState[];
+    enemies: EnemyState[];
+    netGrid?: boolean[][];
+    step?: number;
+    running?: boolean;
+    done?: boolean;
+    stats?: SimStats;
+  }) => void;
+  updateAllies: (allies: AllyState[]) => void;
+  updateEnemies: (enemies: EnemyState[]) => void;
 }
 
 /** 초기 통계 */
@@ -101,6 +115,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   formation: "diversionary",
   step: 0,
   done: false,
+  bridgeMode: false,
 
   // ── 액션 ──
 
@@ -126,6 +141,9 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   tick: (dt) => {
     const state = get();
     if (!state.running || state.done) return;
+
+    // 브릿지 모드에서는 시뮬레이션 스킵 (외부 데이터만 사용)
+    if (state.bridgeMode) return;
 
     const newStep = state.step + 1;
     const elapsedTime = newStep / 60;  // 경과 시간 (초)
@@ -337,6 +355,25 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     set((prev) => ({
       commanderState: { ...prev.commanderState, ...state },
     })),
+
+  // ── 브릿지 모드 전용 함수 ──
+  setBridgeMode: (enabled) => set({ bridgeMode: enabled }),
+
+  setExternalState: (externalState) => {
+    set((prev) => ({
+      allies: externalState.allies,
+      enemies: externalState.enemies,
+      netGrid: externalState.netGrid ?? prev.netGrid,
+      step: externalState.step ?? prev.step,
+      running: externalState.running ?? prev.running,
+      done: externalState.done ?? prev.done,
+      stats: externalState.stats ?? prev.stats,
+    }));
+  },
+
+  updateAllies: (allies) => set({ allies }),
+
+  updateEnemies: (enemies) => set({ enemies }),
 }));
 
 /** 아군 이동 업데이트 (단순화) */

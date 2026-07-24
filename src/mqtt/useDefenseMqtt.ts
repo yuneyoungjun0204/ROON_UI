@@ -121,7 +121,6 @@ export function useDefenseMqtt(): void {
               const ally = store.allies.find(a => a.id === allyId);
               const allyPos = ally ? `(${ally.x.toFixed(2)}, ${ally.z.toFixed(2)})` : 'N/A';
               const first = route[0];
-              const last = route[route.length - 1];
 
               // 첫 WP까지 거리 계산
               const distToFirst = ally ?

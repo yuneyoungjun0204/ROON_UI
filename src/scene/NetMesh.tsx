@@ -5,7 +5,7 @@
 // 3. 격자 오버레이: 칠해진 셀 표시
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useDefenseStore } from "../defenseStore";
 import { DEFENSE_CONFIG as C } from "../config/defense";
@@ -38,21 +38,17 @@ export function NetMesh() {
 function InstalledNet({ net }: { net: NetSegment }) {
   const offset = C.worldSize / 2;
 
-  const points = useMemo(() => [
-    new THREE.Vector3(net.startX - offset, 1, net.startZ - offset),
-    new THREE.Vector3(net.endX - offset, 1, net.endZ - offset),
-  ], [net, offset]);
+  const lineObj = useMemo(() => {
+    const points = [
+      new THREE.Vector3(net.startX - offset, 1, net.startZ - offset),
+      new THREE.Vector3(net.endX - offset, 1, net.endZ - offset),
+    ];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 3 });
+    return new THREE.Line(geometry, material);
+  }, [net, offset]);
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    return geo;
-  }, [points]);
-
-  return (
-    <line geometry={geometry}>
-      <lineBasicMaterial color={0x00ff00} linewidth={3} />
-    </line>
-  );
+  return <primitive object={lineObj} />;
 }
 
 /** 전개 중 그물 - 반투명 파란 선 */
@@ -64,20 +60,22 @@ function DeployingNet({ ally }: { ally: AllyState }) {
   const startX = paintStart?.x ?? ally.x;
   const startZ = paintStart?.z ?? ally.z;
 
-  const points = useMemo(() => [
-    new THREE.Vector3(startX - offset, 0.8, startZ - offset),
-    new THREE.Vector3(ally.x - offset, 0.8, ally.z - offset),
-  ], [startX, startZ, ally.x, ally.z, offset]);
+  const lineObj = useMemo(() => {
+    const points = [
+      new THREE.Vector3(startX - offset, 0.8, startZ - offset),
+      new THREE.Vector3(ally.x - offset, 0.8, ally.z - offset),
+    ];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00aaff,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.7,
+    });
+    return new THREE.Line(geometry, material);
+  }, [startX, startZ, ally.x, ally.z, offset]);
 
-  const geometry = useMemo(() => {
-    return new THREE.BufferGeometry().setFromPoints(points);
-  }, [points]);
-
-  return (
-    <line geometry={geometry}>
-      <lineBasicMaterial color={0x00aaff} linewidth={2} transparent opacity={0.7} />
-    </line>
-  );
+  return <primitive object={lineObj} />;
 }
 
 /** 격자 오버레이 - 칠해진 셀을 반투명 평면으로 표시 */

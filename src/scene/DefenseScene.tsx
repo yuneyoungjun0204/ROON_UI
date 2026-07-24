@@ -424,6 +424,25 @@ function ClusterOverlay() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 경로 연결선 (THREE.Line 사용)
+// ─────────────────────────────────────────────────────────────────────────
+
+function RouteLine({ points, color }: { points: THREE.Vector3[]; color: number }) {
+  const lineObj = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.6,
+    });
+    return new THREE.Line(geometry, material);
+  }, [points, color]);
+
+  return <primitive object={lineObj} />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 웨이포인트 마커
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -451,17 +470,7 @@ function WaypointMarkers() {
           <group key={`ally-wps-${ally.id}`}>
             {/* 경로 연결선 */}
             {routePoints.length > 1 && (
-              <line>
-                <bufferGeometry>
-                  <bufferAttribute
-                    attach="attributes-position"
-                    count={routePoints.length}
-                    array={new Float32Array(routePoints.flatMap(p => [p.x, p.y, p.z]))}
-                    itemSize={3}
-                  />
-                </bufferGeometry>
-                <lineBasicMaterial color={color} linewidth={3} transparent opacity={0.6} />
-              </line>
+              <RouteLine points={routePoints} color={color} />
             )}
 
             {/* 웨이포인트 마커 */}
