@@ -208,7 +208,51 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       return updated;
     });
 
-    // ── 3. 클러스터 업데이트 ──
+    // ── 3. 아군 충돌 체크 ──
+    let allyCollisions = 0;
+    const collidedAllies = new Set<number>();
+
+    // 아군 간 충돌 체크
+    for (let i = 0; i < newAllies.length; i++) {
+      for (let j = i + 1; j < newAllies.length; j++) {
+        const a1 = newAllies[i];
+        const a2 = newAllies[j];
+        if (!a1.alive || !a2.alive) continue;
+
+        const dist = Math.hypot(a1.x - a2.x, a1.z - a2.z);
+        if (dist < C.allyCollisionRadius * 2) {
+          collidedAllies.add(a1.id);
+          collidedAllies.add(a2.id);
+          console.log(`[tick] ⚠ 아군 충돌! Ally ${a1.id} ↔ Ally ${a2.id} (거리: ${dist.toFixed(3)}m)`);
+        }
+      }
+    }
+
+    // 모선-아군 충돌 체크
+    for (const ally of newAllies) {
+      if (!ally.alive) continue;
+
+      const distToMother = Math.hypot(ally.x - mothership.x, ally.z - mothership.z);
+      if (distToMother < C.allyMotherRadius) {
+        collidedAllies.add(ally.id);
+        console.log(`[tick] ⚠ 모선 충돌! Ally ${ally.id} (거리: ${distToMother.toFixed(3)}m)`);
+      }
+    }
+
+    // 충돌한 아군 비활성화
+    const finalAllies = newAllies.map((ally) => {
+      if (collidedAllies.has(ally.id)) {
+        allyCollisions++;
+        return { ...ally, alive: false };
+      }
+      return ally;
+    });
+
+    if (allyCollisions > 0) {
+      console.log(`[tick] 총 ${allyCollisions}척 아군 비활성화`);
+    }
+
+    // ── 4. 클러스터 업데이트 ──
     const clusters = computeClusters(finalEnemies, mothership);
 
     // ── 4. 종료 조건 ──
@@ -217,7 +261,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
 
     set({
       enemies: finalEnemies,
-      allies: newAllies,
+      allies: finalAllies,
       netGrid: newNetGrid,
       nets: newNets,
       clusters,
