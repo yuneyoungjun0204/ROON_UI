@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-외부 시뮬레이터 테스트 코드
-- MQTT로 적군/아군 데이터 발행
+외부 시뮬레이터 (ROS2 노드)
+- ROS2 토픽으로 적군/아군 데이터 발행
+- mqtt_ros2_bridge를 통해 MQTT로 변환
 - bridge 모드 (?mode=bridge)에서 시각화
-- 집중(concentrated), 파상(wave), 양동(diversionary) 포메이션 지원
 
 사용법:
-  python external_simulator.py --formation diversionary
-  python external_simulator.py --formation concentrated
-  python external_simulator.py --formation wave
+  # ROS2 환경 소싱
+  source /opt/ros/humble/setup.zsh
+  source /home/yune/ros2_ws/install/setup.zsh
+
+  # 실행
+  python3 external_simulator.py
+
+  # 포메이션 변경: 집중, 양동, 파상 입력
 
 브라우저:
   http://localhost:5173/?mode=bridge
@@ -19,14 +24,21 @@ import math
 import time
 import random
 import argparse
+import threading
+import queue
 from dataclasses import dataclass, field, asdict
-from typing import List, Optional
+from typing import List
 
+# ROS2
 try:
-    import paho.mqtt.client as mqtt
+    import rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
+    ROS2_AVAILABLE = True
 except ImportError:
-    print("paho-mqtt 설치 필요: pip install paho-mqtt")
-    exit(1)
+    print("ROS2를 찾을 수 없습니다. 환경을 소싱하세요:")
+    print("  source /opt/ros/humble/setup.zsh")
+    ROS2_AVAILABLE = False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -245,6 +257,16 @@ def spawn_allies() -> List[Ally]:
     return allies
 
 
+def spawn_by_formation(formation: str):
+    """포메이션별 스폰"""
+    if formation == "concentrated" or formation == "집중":
+        return spawn_concentrated(), "집중 공격"
+    elif formation == "wave" or formation == "파상":
+        return spawn_wave(), "파상 공격"
+    else:  # diversionary, 양동
+        return spawn_diversionary(), "양동 공격"
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 시뮬레이션 업데이트
 # ═══════════════════════════════════════════════════════════════════════════
@@ -335,176 +357,143 @@ def update_ally(ally: Ally, dt: float) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MQTT 발행
+# ROS2 노드
 # ═══════════════════════════════════════════════════════════════════════════
 
-def publish_state(client: mqtt.Client, enemies: List[Enemy], allies: List[Ally],
-                  mothership: dict, step: int, running: bool):
-    """전체 상태 MQTT 발행"""
-    state = {
-        "allies": [a.to_dict() for a in allies],
-        "enemies": [e.to_dict() for e in enemies],
-        "mothership": mothership,
-        "netInstalled": [],  # 그물 격자 (간단화)
-        "gridSize": CONFIG["gridSize"],
-        "step": step,
-        "running": running,
-        "done": all(not e.alive for e in enemies),
-        "stats": {
-            "captures": sum(1 for e in enemies if not e.alive),
-            "breaches": 0,
-            "netsUsed": sum(CONFIG["netsPerShip"] - a.netsRemaining for a in allies),
-        },
-        "ts": int(time.time()),
-    }
+class ExternalSimulatorNode(Node):
+    """외부 시뮬레이터 ROS2 노드"""
 
-    client.publish("usv/defense/state", json.dumps(state), qos=0)
+    def __init__(self, formation: str = "diversionary", fps: int = 30):
+        super().__init__("external_simulator")
+
+        self.fps = fps
+        self.dt = 1.0 / fps
+        self.formation_name = ""
+        self.mothership = CONFIG["mothership"]
+
+        # 스폰
+        self.enemies, self.formation_name = spawn_by_formation(formation)
+        self.allies = spawn_allies()
+        self.step = 0
+        self.start_time = time.time()
+        self.running = True
+
+        # ROS2 퍼블리셔: /sim/defense/state (JSON)
+        self.state_pub = self.create_publisher(String, "/sim/defense/state", 10)
+
+        # 타이머
+        self.timer = self.create_timer(self.dt, self.tick)
+
+        # 입력 큐 (포메이션 변경용)
+        self.input_queue = queue.Queue()
+        self.input_thread = threading.Thread(target=self._input_loop, daemon=True)
+        self.input_thread.start()
+
+        self.get_logger().info(f"외부 시뮬레이터 시작: {self.formation_name}")
+        self.get_logger().info(f"  적군 {len(self.enemies)}대, 아군 {len(self.allies)}대")
+        self.get_logger().info("  포메이션 변경: 집중, 양동, 파상 입력")
+        self.get_logger().info("  브라우저: http://localhost:5173/?mode=bridge")
+
+    def _input_loop(self):
+        """입력 스레드"""
+        while True:
+            try:
+                line = input()
+                self.input_queue.put(line.strip())
+            except EOFError:
+                break
+
+    def tick(self):
+        """시뮬레이션 틱"""
+        # 입력 체크
+        try:
+            while not self.input_queue.empty():
+                cmd = self.input_queue.get_nowait()
+                if cmd in ["집중", "concentrated", "양동", "diversionary", "파상", "wave"]:
+                    self.enemies, self.formation_name = spawn_by_formation(cmd)
+                    self.allies = spawn_allies()
+                    self.step = 0
+                    self.start_time = time.time()
+                    self.get_logger().info(f"★ 재생성: {self.formation_name}")
+                elif cmd:
+                    self.get_logger().info(f"알 수 없는 명령: {cmd} (사용: 집중, 양동, 파상)")
+        except Exception:
+            pass
+
+        elapsed = time.time() - self.start_time
+
+        # 적 업데이트
+        for enemy in self.enemies:
+            update_enemy(enemy, self.dt, elapsed, self.mothership)
+
+        # 아군 업데이트
+        for ally in self.allies:
+            update_ally(ally, self.dt)
+
+        # ROS2 발행
+        self.publish_state()
+
+        # 모든 적 제거 시 재생성
+        if all(not e.alive for e in self.enemies):
+            self.get_logger().info(f"모든 적 제거! {self.formation_name}으로 재생성...")
+            self.enemies, _ = spawn_by_formation(self.formation_name)
+            self.allies = spawn_allies()
+            self.step = 0
+            self.start_time = time.time()
+
+        self.step += 1
+
+    def publish_state(self):
+        """ROS2 토픽 발행"""
+        state = {
+            "allies": [a.to_dict() for a in self.allies],
+            "enemies": [e.to_dict() for e in self.enemies],
+            "mothership": self.mothership,
+            "netInstalled": [],
+            "gridSize": CONFIG["gridSize"],
+            "step": self.step,
+            "running": self.running,
+            "done": all(not e.alive for e in self.enemies),
+            "stats": {
+                "captures": sum(1 for e in self.enemies if not e.alive),
+                "breaches": 0,
+                "netsUsed": sum(CONFIG["netsPerShip"] - a.netsRemaining for a in self.allies),
+            },
+            "ts": int(time.time()),
+        }
+
+        msg = String()
+        msg.data = json.dumps(state)
+        self.state_pub.publish(msg)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 메인
 # ═══════════════════════════════════════════════════════════════════════════
 
-def spawn_by_formation(formation: str):
-    """포메이션별 스폰"""
-    if formation == "concentrated" or formation == "집중":
-        return spawn_concentrated(), "집중 공격"
-    elif formation == "wave" or formation == "파상":
-        return spawn_wave(), "파상 공격"
-    else:  # diversionary, 양동
-        return spawn_diversionary(), "양동 공격"
-
-
-def input_thread_func(input_queue):
-    """입력 스레드 (비동기 입력)"""
-    import sys
-    import select
-
-    while True:
-        try:
-            # 입력 대기
-            line = input()
-            input_queue.put(line.strip())
-        except EOFError:
-            break
-        except Exception:
-            break
-
-
 def main():
-    parser = argparse.ArgumentParser(description="외부 시뮬레이터 (인터랙티브)")
+    parser = argparse.ArgumentParser(description="외부 시뮬레이터 (ROS2)")
     parser.add_argument("--formation", type=str, default="diversionary",
                         choices=["concentrated", "diversionary", "wave"],
-                        help="초기 포메이션: concentrated(집중), diversionary(양동), wave(파상)")
-    parser.add_argument("--mqtt-host", type=str, default="localhost")
-    parser.add_argument("--mqtt-port", type=int, default=9001)
+                        help="초기 포메이션")
     parser.add_argument("--fps", type=int, default=30, help="발행 주기 (Hz)")
     args = parser.parse_args()
 
-    # MQTT 연결
-    client = mqtt.Client(transport="websockets")
-    try:
-        client.connect(args.mqtt_host, args.mqtt_port)
-        client.loop_start()
-        print(f"[SIM] MQTT 연결 성공: ws://{args.mqtt_host}:{args.mqtt_port}")
-    except Exception as e:
-        print(f"[SIM] MQTT 연결 실패: {e}")
-        print("  Mosquitto WebSocket이 실행 중인지 확인하세요:")
-        print("    sudo systemctl start mosquitto")
+    if not ROS2_AVAILABLE:
+        print("ROS2 환경을 소싱하세요:")
+        print("  source /opt/ros/humble/setup.zsh")
         return
 
-    # 입력 스레드 시작
-    import threading
-    import queue
-    input_queue = queue.Queue()
-    input_thread = threading.Thread(target=input_thread_func, args=(input_queue,), daemon=True)
-    input_thread.start()
-
-    # 초기 스폰
-    enemies, formation_name = spawn_by_formation(args.formation)
-    allies = spawn_allies()
-    mothership = CONFIG["mothership"]
-
-    print(f"[SIM] 포메이션: {formation_name}")
-    print(f"[SIM] 적군 {len(enemies)}대, 아군 {len(allies)}대 스폰 완료")
-    print()
-    print("=" * 50)
-    print("  인터랙티브 모드")
-    print("  - 집중: 집중 공격 포메이션으로 재생성")
-    print("  - 양동: 양동 공격 포메이션으로 재생성")
-    print("  - 파상: 파상 공격 포메이션으로 재생성")
-    print("  - Ctrl+C: 종료")
-    print("=" * 50)
-    print()
-    print(f"[SIM] 브라우저: http://localhost:5173/?mode=bridge")
-    print()
-
-    # 시뮬레이션 루프
-    dt = 1.0 / args.fps
-    step = 0
-    running = True
-    start_time = time.time()
+    rclpy.init()
+    node = ExternalSimulatorNode(formation=args.formation, fps=args.fps)
 
     try:
-        while running:
-            # 입력 체크 (비동기)
-            try:
-                while not input_queue.empty():
-                    cmd = input_queue.get_nowait()
-                    if cmd in ["집중", "concentrated"]:
-                        enemies, formation_name = spawn_by_formation("집중")
-                        allies = spawn_allies()
-                        start_time = time.time()
-                        step = 0
-                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
-                    elif cmd in ["양동", "diversionary"]:
-                        enemies, formation_name = spawn_by_formation("양동")
-                        allies = spawn_allies()
-                        start_time = time.time()
-                        step = 0
-                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
-                    elif cmd in ["파상", "wave"]:
-                        enemies, formation_name = spawn_by_formation("파상")
-                        allies = spawn_allies()
-                        start_time = time.time()
-                        step = 0
-                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
-                    elif cmd:
-                        print(f"[SIM] 알 수 없는 명령: {cmd}")
-                        print("      사용 가능: 집중, 양동, 파상")
-            except Exception:
-                pass
-
-            elapsed = time.time() - start_time
-
-            # 적 업데이트
-            for enemy in enemies:
-                update_enemy(enemy, dt, elapsed, mothership)
-
-            # 아군 업데이트
-            for ally in allies:
-                update_ally(ally, dt)
-
-            # MQTT 발행
-            publish_state(client, enemies, allies, mothership, step, running)
-
-            # 모든 적 제거 시 자동 재생성 (같은 포메이션)
-            if all(not e.alive for e in enemies):
-                print(f"\n[SIM] 모든 적 제거! 같은 포메이션으로 재생성...")
-                enemies, _ = spawn_by_formation(formation_name)
-                allies = spawn_allies()
-                start_time = time.time()
-                step = 0
-                print(f"[SIM] ★ 재생성 완료: {formation_name}\n")
-
-            step += 1
-            time.sleep(dt)
-
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        print("\n[SIM] 종료됨")
+        pass
     finally:
-        client.loop_stop()
-        client.disconnect()
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
