@@ -365,29 +365,41 @@ def publish_state(client: mqtt.Client, enemies: List[Enemy], allies: List[Ally],
 # 메인
 # ═══════════════════════════════════════════════════════════════════════════
 
+def spawn_by_formation(formation: str):
+    """포메이션별 스폰"""
+    if formation == "concentrated" or formation == "집중":
+        return spawn_concentrated(), "집중 공격"
+    elif formation == "wave" or formation == "파상":
+        return spawn_wave(), "파상 공격"
+    else:  # diversionary, 양동
+        return spawn_diversionary(), "양동 공격"
+
+
+def input_thread_func(input_queue):
+    """입력 스레드 (비동기 입력)"""
+    import sys
+    import select
+
+    while True:
+        try:
+            # 입력 대기
+            line = input()
+            input_queue.put(line.strip())
+        except EOFError:
+            break
+        except Exception:
+            break
+
+
 def main():
-    parser = argparse.ArgumentParser(description="외부 시뮬레이터")
+    parser = argparse.ArgumentParser(description="외부 시뮬레이터 (인터랙티브)")
     parser.add_argument("--formation", type=str, default="diversionary",
                         choices=["concentrated", "diversionary", "wave"],
-                        help="포메이션: concentrated(집중), diversionary(양동), wave(파상)")
+                        help="초기 포메이션: concentrated(집중), diversionary(양동), wave(파상)")
     parser.add_argument("--mqtt-host", type=str, default="localhost")
     parser.add_argument("--mqtt-port", type=int, default=9001)
     parser.add_argument("--fps", type=int, default=30, help="발행 주기 (Hz)")
     args = parser.parse_args()
-
-    # 포메이션별 스폰
-    print(f"[SIM] 포메이션: {args.formation}")
-    if args.formation == "concentrated":
-        enemies = spawn_concentrated()
-    elif args.formation == "wave":
-        enemies = spawn_wave()
-    else:
-        enemies = spawn_diversionary()
-
-    allies = spawn_allies()
-    mothership = CONFIG["mothership"]
-
-    print(f"[SIM] 적군 {len(enemies)}대, 아군 {len(allies)}대 스폰 완료")
 
     # MQTT 연결
     client = mqtt.Client(transport="websockets")
@@ -401,17 +413,68 @@ def main():
         print("    sudo systemctl start mosquitto")
         return
 
+    # 입력 스레드 시작
+    import threading
+    import queue
+    input_queue = queue.Queue()
+    input_thread = threading.Thread(target=input_thread_func, args=(input_queue,), daemon=True)
+    input_thread.start()
+
+    # 초기 스폰
+    enemies, formation_name = spawn_by_formation(args.formation)
+    allies = spawn_allies()
+    mothership = CONFIG["mothership"]
+
+    print(f"[SIM] 포메이션: {formation_name}")
+    print(f"[SIM] 적군 {len(enemies)}대, 아군 {len(allies)}대 스폰 완료")
+    print()
+    print("=" * 50)
+    print("  인터랙티브 모드")
+    print("  - 집중: 집중 공격 포메이션으로 재생성")
+    print("  - 양동: 양동 공격 포메이션으로 재생성")
+    print("  - 파상: 파상 공격 포메이션으로 재생성")
+    print("  - Ctrl+C: 종료")
+    print("=" * 50)
+    print()
+    print(f"[SIM] 브라우저: http://localhost:5173/?mode=bridge")
+    print()
+
     # 시뮬레이션 루프
     dt = 1.0 / args.fps
     step = 0
     running = True
     start_time = time.time()
 
-    print(f"[SIM] 시뮬레이션 시작 (Ctrl+C로 종료)")
-    print(f"[SIM] 브라우저: http://localhost:5173/?mode=bridge")
-
     try:
         while running:
+            # 입력 체크 (비동기)
+            try:
+                while not input_queue.empty():
+                    cmd = input_queue.get_nowait()
+                    if cmd in ["집중", "concentrated"]:
+                        enemies, formation_name = spawn_by_formation("집중")
+                        allies = spawn_allies()
+                        start_time = time.time()
+                        step = 0
+                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
+                    elif cmd in ["양동", "diversionary"]:
+                        enemies, formation_name = spawn_by_formation("양동")
+                        allies = spawn_allies()
+                        start_time = time.time()
+                        step = 0
+                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
+                    elif cmd in ["파상", "wave"]:
+                        enemies, formation_name = spawn_by_formation("파상")
+                        allies = spawn_allies()
+                        start_time = time.time()
+                        step = 0
+                        print(f"\n[SIM] ★ 재생성: {formation_name} ({len(enemies)}대)\n")
+                    elif cmd:
+                        print(f"[SIM] 알 수 없는 명령: {cmd}")
+                        print("      사용 가능: 집중, 양동, 파상")
+            except Exception:
+                pass
+
             elapsed = time.time() - start_time
 
             # 적 업데이트
@@ -425,10 +488,14 @@ def main():
             # MQTT 발행
             publish_state(client, enemies, allies, mothership, step, running)
 
-            # 종료 조건
+            # 모든 적 제거 시 자동 재생성 (같은 포메이션)
             if all(not e.alive for e in enemies):
-                print("[SIM] 모든 적 제거! 시뮬레이션 종료")
-                running = False
+                print(f"\n[SIM] 모든 적 제거! 같은 포메이션으로 재생성...")
+                enemies, _ = spawn_by_formation(formation_name)
+                allies = spawn_allies()
+                start_time = time.time()
+                step = 0
+                print(f"[SIM] ★ 재생성 완료: {formation_name}\n")
 
             step += 1
             time.sleep(dt)
