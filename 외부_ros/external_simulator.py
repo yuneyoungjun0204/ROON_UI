@@ -34,11 +34,45 @@ try:
     import rclpy
     from rclpy.node import Node
     from std_msgs.msg import String
+    from sensor_msgs.msg import NavSatFix, Imu
+    from geometry_msgs.msg import Quaternion
     ROS2_AVAILABLE = True
 except ImportError:
     print("ROS2를 찾을 수 없습니다. 환경을 소싱하세요:")
     print("  source /opt/ros/humble/setup.zsh")
     ROS2_AVAILABLE = False
+
+
+# GPS 원점 (모선 위치 - usv_bridge와 동일)
+MOTHER_LAT = 34.625    # 남해 매물도 근해
+MOTHER_LON = 128.52
+
+
+def sim_to_gps(x: float, z: float) -> tuple:
+    """시뮬레이터 좌표 → GPS 변환"""
+    sim_center = CONFIG["worldSize"] / 2
+    meters_per_deg_lat = 111320
+    meters_per_deg_lon = 111320 * math.cos(math.radians(MOTHER_LAT))
+
+    dx = x - sim_center
+    dz = z - sim_center
+
+    lat = MOTHER_LAT - dz / meters_per_deg_lat
+    lon = MOTHER_LON + dx / meters_per_deg_lon
+
+    return lat, lon
+
+
+def heading_to_quaternion(heading_deg: float) -> Quaternion:
+    """Heading(deg) → Quaternion (ENU 좌표계)"""
+    # NAV convention (0=North, CW+) → ENU (0=East, CCW+)
+    yaw_enu = math.radians(90 - heading_deg)
+    q = Quaternion()
+    q.x = 0.0
+    q.y = 0.0
+    q.z = math.sin(yaw_enu / 2)
+    q.w = math.cos(yaw_enu / 2)
+    return q
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -381,6 +415,40 @@ class ExternalSimulatorNode(Node):
         # ROS2 퍼블리셔: /sim/defense/state (JSON)
         self.state_pub = self.create_publisher(String, "/sim/defense/state", 10)
 
+        # 아군 퍼블리셔: /ally_{i}/fix, /ally_{i}/imu
+        self.ally_fix_pubs = []
+        self.ally_imu_pubs = []
+        for i in range(CONFIG["nAllies"]):
+            self.ally_fix_pubs.append(
+                self.create_publisher(NavSatFix, f"/ally_{i}/fix", 10)
+            )
+            self.ally_imu_pubs.append(
+                self.create_publisher(Imu, f"/ally_{i}/imu", 10)
+            )
+
+        # 적군 퍼블리셔: /enemy_{i}/fix
+        self.enemy_fix_pubs = []
+        for i in range(CONFIG["nEnemies"]):
+            self.enemy_fix_pubs.append(
+                self.create_publisher(NavSatFix, f"/enemy_{i}/fix", 10)
+            )
+
+        # 모선 퍼블리셔: /mothership/fix
+        self.mothership_fix_pub = self.create_publisher(NavSatFix, "/mothership/fix", 10)
+
+        # 아군 웨이포인트 구독: /ally_{i}/waypoints
+        from nav_msgs.msg import Path
+        self.wp_subs = []
+        for i in range(CONFIG["nAllies"]):
+            self.wp_subs.append(
+                self.create_subscription(
+                    Path,
+                    f"/ally_{i}/waypoints",
+                    lambda msg, idx=i: self._on_waypoints(msg, idx),
+                    10
+                )
+            )
+
         # 타이머
         self.timer = self.create_timer(self.dt, self.tick)
 
@@ -392,7 +460,39 @@ class ExternalSimulatorNode(Node):
         self.get_logger().info(f"외부 시뮬레이터 시작: {self.formation_name}")
         self.get_logger().info(f"  적군 {len(self.enemies)}대, 아군 {len(self.allies)}대")
         self.get_logger().info("  포메이션 변경: 집중, 양동, 파상 입력")
+        self.get_logger().info("  웨이포인트 토픽: /ally_{i}/waypoints")
         self.get_logger().info("  브라우저: http://localhost:5173/?mode=bridge")
+
+    def _on_waypoints(self, msg, ally_idx: int):
+        """웨이포인트 명령 수신"""
+        from nav_msgs.msg import Path
+
+        if ally_idx >= len(self.allies):
+            return
+
+        ally = self.allies[ally_idx]
+        new_route = []
+
+        for pose in msg.poses:
+            # GPS 좌표 → 시뮬레이터 좌표
+            lat = pose.pose.position.y
+            lon = pose.pose.position.x
+
+            sim_center = CONFIG["worldSize"] / 2
+            meters_per_deg_lat = 111320
+            meters_per_deg_lon = 111320 * math.cos(math.radians(MOTHER_LAT))
+
+            dlat = lat - MOTHER_LAT
+            dlon = lon - MOTHER_LON
+
+            x = sim_center + dlon * meters_per_deg_lon
+            z = sim_center - dlat * meters_per_deg_lat
+
+            new_route.append({"x": x, "z": z, "paint": False})
+
+        if new_route:
+            ally.route = new_route
+            self.get_logger().info(f"Ally {ally_idx}: 웨이포인트 {len(new_route)}개 수신")
 
     def _input_loop(self):
         """입력 스레드"""
@@ -445,6 +545,52 @@ class ExternalSimulatorNode(Node):
 
     def publish_state(self):
         """ROS2 토픽 발행"""
+        now = self.get_clock().now().to_msg()
+
+        # 아군 개별 토픽 발행
+        for ally in self.allies:
+            if ally.id < len(self.ally_fix_pubs):
+                lat, lon = sim_to_gps(ally.x, ally.z)
+
+                # NavSatFix
+                fix = NavSatFix()
+                fix.header.stamp = now
+                fix.header.frame_id = "wgs84"
+                fix.latitude = lat
+                fix.longitude = lon
+                fix.altitude = 0.0
+                self.ally_fix_pubs[ally.id].publish(fix)
+
+                # Imu (heading)
+                imu = Imu()
+                imu.header.stamp = now
+                imu.header.frame_id = f"ally_{ally.id}"
+                imu.orientation = heading_to_quaternion(ally.heading)
+                self.ally_imu_pubs[ally.id].publish(imu)
+
+        # 적군 개별 토픽 발행
+        for enemy in self.enemies:
+            if enemy.id < len(self.enemy_fix_pubs) and enemy.alive:
+                lat, lon = sim_to_gps(enemy.x, enemy.z)
+
+                fix = NavSatFix()
+                fix.header.stamp = now
+                fix.header.frame_id = "wgs84"
+                fix.latitude = lat
+                fix.longitude = lon
+                fix.altitude = 0.0
+                self.enemy_fix_pubs[enemy.id].publish(fix)
+
+        # 모선 토픽 발행
+        fix = NavSatFix()
+        fix.header.stamp = now
+        fix.header.frame_id = "wgs84"
+        fix.latitude = MOTHER_LAT
+        fix.longitude = MOTHER_LON
+        fix.altitude = 0.0
+        self.mothership_fix_pub.publish(fix)
+
+        # 전체 상태 (JSON)
         state = {
             "allies": [a.to_dict() for a in self.allies],
             "enemies": [e.to_dict() for e in self.enemies],
