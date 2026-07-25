@@ -9,12 +9,15 @@
 // - 지휘관 판단 패널
 // ─────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useDefenseStore } from "../defenseStore";
 import { DEFENSE_CONFIG as C, FORMATION_NAMES } from "../config/defense";
 import type { EnemyFormation, AllyState } from "../types/defense";
 import { CommanderPanel } from "./CommanderPanel";
 import "./DefenseHud.css";
+
+// Commander API (Vite 개발 서버에 통합됨)
+const COMMANDER_API = "/api/commander";
 
 /** 버드아이 뷰 미니맵 */
 function BattlefieldMinimap() {
@@ -160,6 +163,141 @@ function CameraHelp() {
   );
 }
 
+/** Commander 제어 패널 */
+function CommanderControl() {
+  const [status, setStatus] = useState<"stopped" | "running" | "starting" | "error">("stopped");
+  const [selectedLlm, setSelectedLlm] = useState<"openai" | "claude" | "gemini">("openai");
+  const [world, setWorld] = useState(33);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // 상태 폴링
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`${COMMANDER_API}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          setStatus(data.running ? "running" : "stopped");
+          setErrorMsg("");
+        }
+      } catch {
+        // 서버가 꺼져있으면 무시
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const startCommander = useCallback(async () => {
+    setStatus("starting");
+    setErrorMsg("");
+
+    try {
+      const res = await fetch(`${COMMANDER_API}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ world, llm: selectedLlm }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setStatus("running");
+        console.log("[Commander] Started:", data.command);
+      } else {
+        setStatus("error");
+        setErrorMsg(data.error || "Failed to start");
+      }
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg("API 연결 실패");
+    }
+  }, [world, selectedLlm]);
+
+  const stopCommander = useCallback(async () => {
+    try {
+      const res = await fetch(`${COMMANDER_API}/stop`, { method: "POST" });
+      if (res.ok) {
+        setStatus("stopped");
+      }
+    } catch {
+      setErrorMsg("Failed to stop");
+    }
+  }, []);
+
+  const statusColor = {
+    stopped: "#666",
+    running: "#00cc66",
+    starting: "#ffaa00",
+    error: "#ff4444",
+  }[status];
+
+  const statusText = {
+    stopped: "중지됨",
+    running: "실행 중",
+    starting: "시작 중...",
+    error: "오류",
+  }[status];
+
+  return (
+    <div className="commander-control">
+      <div className="panel-title">
+        ROS2 Commander
+        <span className="status-dot" style={{ backgroundColor: statusColor }} />
+        <span className="status-text" style={{ color: statusColor }}>{statusText}</span>
+      </div>
+
+      {status !== "running" && (
+        <div className="commander-options">
+          <div className="option-row">
+            <label>LLM:</label>
+            <select
+              value={selectedLlm}
+              onChange={(e) => setSelectedLlm(e.target.value as "openai" | "claude" | "gemini")}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+              <option value="gemini">Gemini</option>
+            </select>
+          </div>
+          <div className="option-row">
+            <label>World:</label>
+            <input
+              type="number"
+              value={world}
+              onChange={(e) => setWorld(Number(e.target.value))}
+              min={10}
+              max={100}
+              style={{ width: 60 }}
+            />
+            <span>m</span>
+          </div>
+        </div>
+      )}
+
+      {errorMsg && <div className="error-msg">{errorMsg}</div>}
+
+      <div className="commander-buttons">
+        {status === "running" ? (
+          <button className="cmd-btn stop" onClick={stopCommander}>
+            Commander 중지
+          </button>
+        ) : (
+          <button
+            className="cmd-btn start"
+            onClick={startCommander}
+            disabled={status === "starting"}
+          >
+            {status === "starting" ? "시작 중..." : "Commander 시작"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DefenseHud() {
   const stats = useDefenseStore((s) => s.stats);
   const step = useDefenseStore((s) => s.step);
@@ -243,6 +381,9 @@ export function DefenseHud() {
 
       {/* 카메라 도움말 */}
       <CameraHelp />
+
+      {/* Commander 제어 */}
+      <CommanderControl />
 
       {/* 시나리오 선택 */}
       <div className="formation-panel">

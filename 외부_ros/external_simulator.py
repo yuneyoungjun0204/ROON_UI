@@ -406,6 +406,7 @@ class ExternalSimulatorNode(Node):
         self.step = 0
         self.start_time = time.time()
         self.running = True
+        self.netInstalled = []  # 설치된 그물 셀 좌표 [(i, j), ...]
 
         # ROS2 퍼블리셔: /sim/defense/state (JSON)
         self.state_pub = self.create_publisher(String, "/sim/defense/state", 10)
@@ -444,6 +445,14 @@ class ExternalSimulatorNode(Node):
                 )
             )
 
+        # 시스템 명령 구독: /sim/commands (리셋 등)
+        self.cmd_sub = self.create_subscription(
+            String,
+            "/sim/commands",
+            self._on_command,
+            10
+        )
+
         # 타이머
         self.timer = self.create_timer(self.dt, self.tick)
 
@@ -457,6 +466,27 @@ class ExternalSimulatorNode(Node):
         self.get_logger().info("  포메이션 변경: 집중, 양동, 파상 입력")
         self.get_logger().info("  웨이포인트 토픽: /ally_{i}/waypoints")
         self.get_logger().info("  브라우저: http://localhost:5173/?mode=bridge")
+
+    def _on_command(self, msg):
+        """시스템 명령 수신 (리셋 등)"""
+        try:
+            data = json.loads(msg.data)
+            cmd = data.get("command", "")
+        except json.JSONDecodeError:
+            cmd = msg.data.strip()
+
+        if cmd == "reset":
+            self.get_logger().info("★ 리셋 명령 수신 - 상태 초기화")
+            self.reset_simulation()
+
+    def reset_simulation(self):
+        """시뮬레이션 완전 초기화"""
+        self.enemies, self.formation_name = spawn_by_formation(self.formation_name)
+        self.allies = spawn_allies()
+        self.netInstalled = []  # 그물 초기화
+        self.step = 0
+        self.start_time = time.time()
+        self.get_logger().info(f"★ 초기화 완료: {self.formation_name}")
 
     def _on_waypoints(self, msg, ally_idx: int):
         """웨이포인트 명령 수신"""
@@ -507,9 +537,12 @@ class ExternalSimulatorNode(Node):
                 if cmd in ["집중", "concentrated", "양동", "diversionary", "파상", "wave"]:
                     self.enemies, self.formation_name = spawn_by_formation(cmd)
                     self.allies = spawn_allies()
+                    self.netInstalled = []  # 그물도 초기화
                     self.step = 0
                     self.start_time = time.time()
                     self.get_logger().info(f"★ 재생성: {self.formation_name}")
+                elif cmd in ["리셋", "reset"]:
+                    self.reset_simulation()
                 elif cmd:
                     self.get_logger().info(f"알 수 없는 명령: {cmd} (사용: 집중, 양동, 파상)")
         except Exception:
@@ -533,6 +566,7 @@ class ExternalSimulatorNode(Node):
             self.get_logger().info(f"모든 적 제거! {self.formation_name}으로 재생성...")
             self.enemies, _ = spawn_by_formation(self.formation_name)
             self.allies = spawn_allies()
+            self.netInstalled = []  # 그물도 초기화
             self.step = 0
             self.start_time = time.time()
 
@@ -590,7 +624,7 @@ class ExternalSimulatorNode(Node):
             "allies": [a.to_dict() for a in self.allies],
             "enemies": [e.to_dict() for e in self.enemies],
             "mothership": self.mothership,
-            "netInstalled": [],
+            "netInstalled": self.netInstalled,
             "gridSize": CONFIG["gridSize"],
             "step": self.step,
             "running": self.running,

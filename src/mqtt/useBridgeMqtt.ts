@@ -69,6 +69,7 @@ export function useBridgeMqtt(): void {
         client.subscribe(`usv/ally/${i}/route`, { qos: 1 });
       }
       client.subscribe("usv/system/commands", { qos: 1 });
+      client.subscribe("usv/system/events", { qos: 1 });  // 리셋 이벤트 구독
       client.subscribe("usv/commander/state", { qos: 1 });
 
       console.log(`[BridgeMQTT] 구독 완료: ${C.nAllies}대 아군, ${C.nEnemies}대 적군`);
@@ -221,6 +222,14 @@ export function useBridgeMqtt(): void {
           } else if (data.command === "stop") {
             if (store.running) store.toggleRunning();
           } else if (data.command === "reset") {
+            store.reset();
+          }
+        }
+
+        // 시스템 이벤트 (리셋 등)
+        if (topic === "usv/system/events") {
+          if (data.event === "reset") {
+            console.log("[BridgeMQTT] 리셋 이벤트 수신 - 상태 초기화");
             store.reset();
           }
         }

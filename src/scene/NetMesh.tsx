@@ -100,7 +100,14 @@ function GridOverlay({ netGrid }: { netGrid: boolean[][] }) {
   // 인스턴스 행렬 업데이트
   useEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh || filledCells.length === 0) return;
+    if (!mesh) return;
+
+    // ★ 리셋 시 그물 제거 (filledCells가 비어있으면 count=0)
+    if (filledCells.length === 0) {
+      mesh.count = 0;
+      mesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
 
     const tempMatrix = new THREE.Matrix4();
     const rotation = new THREE.Matrix4().makeRotationX(-Math.PI / 2);

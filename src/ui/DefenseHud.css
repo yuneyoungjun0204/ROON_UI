@@ -411,3 +411,116 @@
   font-family: monospace;
   color: #88ccff;
 }
+
+/* Commander 제어 패널 */
+.commander-control {
+  position: absolute;
+  bottom: 100px;
+  left: 20px;
+  width: 220px;
+  background: rgba(0, 20, 40, 0.9);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(100, 200, 255, 0.3);
+}
+
+.commander-control .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.commander-control .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: auto;
+}
+
+.commander-control .status-text {
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.commander-options {
+  margin-bottom: 12px;
+}
+
+.commander-options .option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.commander-options label {
+  color: #88aacc;
+  min-width: 45px;
+}
+
+.commander-options select,
+.commander-options input {
+  background: rgba(0, 40, 60, 0.8);
+  border: 1px solid rgba(100, 200, 255, 0.3);
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.commander-options select:focus,
+.commander-options input:focus {
+  outline: none;
+  border-color: #00ccff;
+}
+
+.commander-control .error-msg {
+  font-size: 11px;
+  color: #ff6666;
+  margin-bottom: 8px;
+  padding: 6px;
+  background: rgba(255, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.commander-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.cmd-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cmd-btn.start {
+  background: linear-gradient(135deg, #0066cc, #0088ff);
+  color: white;
+}
+
+.cmd-btn.start:hover {
+  background: linear-gradient(135deg, #0077dd, #0099ff);
+  transform: translateY(-1px);
+}
+
+.cmd-btn.start:disabled {
+  background: #444;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cmd-btn.stop {
+  background: linear-gradient(135deg, #cc3300, #ff4400);
+  color: white;
+}
+
+.cmd-btn.stop:hover {
+  background: linear-gradient(135deg, #dd4400, #ff5500);
+}
