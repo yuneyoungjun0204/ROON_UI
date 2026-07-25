@@ -13,6 +13,8 @@ import { useDefenseStore, startDefenseLoop } from "../defenseStore";
 import { DEFENSE_CONFIG as C } from "../config/defense";
 import { Mothership } from "./Mothership";
 import { NetMesh } from "./NetMesh";
+import { DetailedShip } from "./DetailedShip";
+import { CollisionDebug } from "./CollisionDebug";
 import type { ShipState } from "../types/defense";
 import { wavesGlsl } from "../sim/waves";
 
@@ -564,22 +566,28 @@ function DefenseSceneContent() {
       {/* 모선 */}
       <Mothership state={mothership} />
 
-      {/* 아군 (3대) - 파란색 */}
+      {/* 아군 (3대) - 파란색 상세 선박 */}
       {allies.map((ally) => (
-        <TacticalShip
+        <DetailedShip
           key={`ally-${ally.id}`}
-          state={ally}
+          x={ally.x}
+          z={ally.z}
+          heading={ally.heading}
           team="ally"
+          alive={ally.alive}
           selected={ally.id === selectedAlly}
         />
       ))}
 
-      {/* 적 (10대) - 빨간색 */}
+      {/* 적 (10대) - 빨간색 상세 선박 */}
       {enemies.map((enemy) => (
-        <TacticalShip
+        <DetailedShip
           key={`enemy-${enemy.id}`}
-          state={enemy}
+          x={enemy.x}
+          z={enemy.z}
+          heading={enemy.heading}
           team="enemy"
+          alive={enemy.alive}
         />
       ))}
 
@@ -591,6 +599,9 @@ function DefenseSceneContent() {
 
       {/* 클러스터 표시 */}
       <ClusterOverlay />
+
+      {/* 충돌 박스 디버그 (URL에 ?debug=collision 추가 시 표시) */}
+      <CollisionDebug />
     </>
   );
 }

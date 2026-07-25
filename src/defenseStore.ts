@@ -20,11 +20,17 @@ import type {
 import { spawnEnemies, spawnAllies } from "./sim/formations";
 import {
   createEmptyNetGrid,
+  createEmptyNetTimeGrid,
   updateNetPainting,
   checkCapture,
   checkBreach,
   updateEnemy,
 } from "./sim/netSystem";
+import {
+  checkAllyCollisions,
+  checkMothershipCollisions,
+  checkAllAllyNetCollisions,
+} from "./sim/collision";
 
 interface DefenseStore {
   // ── 상태 ──
@@ -33,6 +39,7 @@ interface DefenseStore {
   mothership: MothershipState;
   nets: NetSegment[];
   netGrid: boolean[][];
+  netGridTime: number[][];  // 그물 설치 시점 (step)
   clusters: ClusterInfo[];
   stats: SimStats;
   commanderState: CommanderState;
@@ -108,6 +115,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   mothership: { ...initialMothership },
   nets: [],
   netGrid: createEmptyNetGrid(),
+  netGridTime: createEmptyNetTimeGrid(),
   clusters: [],
   stats: { ...initialStats },
   commanderState: { ...initialCommanderState },
@@ -129,6 +137,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       mothership: { ...initialMothership },
       nets: [],
       netGrid: createEmptyNetGrid(),
+      netGridTime: createEmptyNetTimeGrid(),
       clusters: [],
       stats: { ...initialStats },
       commanderState: { ...initialCommanderState },
@@ -156,6 +165,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     let captures = state.stats.captures;
     let breaches = state.stats.breaches;
     let newNetGrid = state.netGrid;  // 포획 체크 전에 선언
+    let newNetGridTime = state.netGridTime;  // 그물 설치 시점 추적
 
     const movedEnemies = state.enemies.map((enemy) => {
       if (!enemy.alive) return enemy;
@@ -201,11 +211,25 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
           updated, prevX, prevZ, newNetGrid, dt
         );
 
-        // 격자가 변경되었는지 확인
+        // 격자가 변경되었는지 확인하고 설치 시점 기록
         const oldFilledCount = newNetGrid.flat().filter(Boolean).length;
         const newFilledCount = updatedGrid.flat().filter(Boolean).length;
-        if (newFilledCount > oldFilledCount && Math.random() < 0.1) {
-          console.log(`[tick] Ally ${updated.id}: 그물 칠하기 ${oldFilledCount} → ${newFilledCount} 셀`);
+
+        // 새로 칠해진 셀의 설치 시점 기록
+        if (newFilledCount > oldFilledCount) {
+          // 새 격자를 복사 (불변성 유지)
+          newNetGridTime = newNetGridTime.map((row, gz) =>
+            row.map((time, gx) => {
+              // 새로 칠해진 셀이면 현재 스텝 기록
+              if (updatedGrid[gz][gx] && !newNetGrid[gz][gx]) {
+                return newStep;
+              }
+              return time;
+            })
+          );
+          if (Math.random() < 0.1) {
+            console.log(`[tick] Ally ${updated.id}: 그물 칠하기 ${oldFilledCount} → ${newFilledCount} 셀 (step ${newStep})`);
+          }
         }
 
         newNetGrid = updatedGrid;
@@ -229,35 +253,41 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       return updated;
     });
 
-    // ── 3. 아군 충돌 체크 ──
+    // ── 3. 아군 충돌 체크 (OBB 기반 실제 메쉬 충돌) ──
     let allyCollisions = 0;
     const collidedAllies = new Set<number>();
 
-    // 아군 간 충돌 체크
-    for (let i = 0; i < newAllies.length; i++) {
-      for (let j = i + 1; j < newAllies.length; j++) {
-        const a1 = newAllies[i];
-        const a2 = newAllies[j];
-        if (!a1.alive || !a2.alive) continue;
-
-        const dist = Math.hypot(a1.x - a2.x, a1.z - a2.z);
-        if (dist < C.allyCollisionRadius * 2) {
-          collidedAllies.add(a1.id);
-          collidedAllies.add(a2.id);
-          console.log(`[tick] ⚠ 아군 충돌! Ally ${a1.id} ↔ Ally ${a2.id} (거리: ${dist.toFixed(3)}m)`);
-        }
+    // 아군 간 충돌 체크 (OBB vs OBB)
+    const allyPairCollisions = checkAllyCollisions(newAllies);
+    for (const [id1, id2] of allyPairCollisions) {
+      collidedAllies.add(id1);
+      collidedAllies.add(id2);
+      const a1 = newAllies.find(a => a.id === id1);
+      const a2 = newAllies.find(a => a.id === id2);
+      if (a1 && a2) {
+        console.log(`[tick] ⚠ 아군 충돌! (OBB) Ally ${id1} ↔ Ally ${id2}`);
       }
     }
 
-    // 모선-아군 충돌 체크
-    for (const ally of newAllies) {
-      if (!ally.alive) continue;
+    // 모선-아군 충돌 체크 (OBB vs Circle)
+    const motherCollisions = checkMothershipCollisions(newAllies, mothership);
+    for (const allyId of motherCollisions) {
+      collidedAllies.add(allyId);
+      console.log(`[tick] ⚠ 모선 충돌! (OBB) Ally ${allyId}`);
+    }
 
-      const distToMother = Math.hypot(ally.x - mothership.x, ally.z - mothership.z);
-      if (distToMother < C.allyMotherRadius) {
-        collidedAllies.add(ally.id);
-        console.log(`[tick] ⚠ 모선 충돌! Ally ${ally.id} (거리: ${distToMother.toFixed(3)}m)`);
-      }
+    // 아군-그물 충돌 체크 (설치된 그물에 아군이 진입, 2초 지연)
+    const netCollisions = checkAllAllyNetCollisions(
+      newAllies,
+      newNetGrid,
+      newNetGridTime,
+      newStep,
+      C.worldSize,
+      C.gridSize
+    );
+    for (const allyId of netCollisions) {
+      collidedAllies.add(allyId);
+      console.log(`[tick] ⚠ 그물 충돌! Ally ${allyId}`);
     }
 
     // 충돌한 아군 비활성화
@@ -269,8 +299,11 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       return ally;
     });
 
+    // 그물 충돌 통계
+    const netTouchCount = netCollisions.length;
+
     if (allyCollisions > 0) {
-      console.log(`[tick] 총 ${allyCollisions}척 아군 비활성화`);
+      console.log(`[tick] 총 ${allyCollisions}척 아군 비활성화 (OBB 충돌, 그물 ${netTouchCount}척)`);
     }
 
     // ── 4. 클러스터 업데이트 ──
@@ -284,6 +317,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       enemies: finalEnemies,
       allies: finalAllies,
       netGrid: newNetGrid,
+      netGridTime: newNetGridTime,
       nets: newNets,
       clusters,
       step: newStep,
@@ -293,6 +327,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
         captures,
         breaches,
         netsUsed,
+        netTouches: state.stats.netTouches + netTouchCount,
+        allyCollisions: state.stats.allyCollisions + allyCollisions,
         survived: done ? aliveEnemies : state.stats.survived,
       },
     });

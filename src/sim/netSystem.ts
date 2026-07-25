@@ -34,6 +34,13 @@ export function createEmptyNetGrid(): boolean[][] {
   );
 }
 
+/** 빈 그물 시간 격자 생성 (설치 시점 추적) */
+export function createEmptyNetTimeGrid(): number[][] {
+  return Array(C.gridSize).fill(null).map(() =>
+    Array(C.gridSize).fill(0)  // 0 = 그물 없음
+  );
+}
+
 /**
  * 그물 전개 업데이트
  * - ally가 그물 WP 구간을 이동 중이면 경로를 따라 격자를 칠함
