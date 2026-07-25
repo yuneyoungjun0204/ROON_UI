@@ -45,6 +45,8 @@ function gpsToSim(lat: number, lon: number, motherLat: number, motherLon: number
 /** 방어 모드 MQTT 훅 */
 export function useDefenseMqtt(): void {
   const clientRef = useRef<MqttClientType | null>(null);
+  const prevResetTimestamp = useRef<number>(0);
+  const prevAlliesAlive = useRef<boolean[]>([]);
 
   useEffect(() => {
     // 설정에서 MQTT가 비활성화되면 연결하지 않음
@@ -126,12 +128,27 @@ export function useDefenseMqtt(): void {
               const distToFirst = ally ?
                 Math.hypot(first.x - ally.x, first.z - ally.z).toFixed(2) : 'N/A';
 
+              // ★ 그물 전개 중(painting=true)이면 경로 업데이트 스킵
+              // 그물 전개 중에는 경로가 고정되어야 함
+              if (ally?.painting) {
+                console.log(
+                  `[DefenseMQTT] Ally ${allyId}: 🎨 그물 전개 중 - 경로 업데이트 스킵 ` +
+                  `| 현재=${allyPos} | 수신된 WP=${route.length}개`
+                );
+                return;  // painting 중에는 경로 변경 무시
+              }
+
               // 기존 경로와 비교 (좌표 변경 OR paint 플래그 변경)
               const prevRoute = ally?.route || [];
+
+              // ★ 모든 WP 좌표 비교 (첫 WP만이 아니라 전체)
               const coordChanged = prevRoute.length !== route.length ||
-                (prevRoute.length > 0 && route.length > 0 &&
-                  (Math.abs(prevRoute[0].x - route[0].x) > 0.1 ||
-                   Math.abs(prevRoute[0].z - route[0].z) > 0.1));
+                route.some((wp: { x: number; z: number }, i: number) => {
+                  const prev = prevRoute[i];
+                  if (!prev) return true;
+                  return Math.abs(prev.x - wp.x) > 0.1 || Math.abs(prev.z - wp.z) > 0.1;
+                });
+
               // ★ paint 플래그 변경 감지 (그물 전개 명령)
               const paintChanged = prevRoute.length === route.length &&
                 prevRoute.some((wp: { paint: boolean }, i: number) =>
@@ -208,6 +225,41 @@ export function useDefenseMqtt(): void {
 
       const state = useDefenseStore.getState();
       const ts = Math.floor(Date.now() / 1000);
+
+      // ── 리셋 이벤트 발행 ──
+      if (state.resetTimestamp > 0 && state.resetTimestamp !== prevResetTimestamp.current) {
+        prevResetTimestamp.current = state.resetTimestamp;
+        client.publish("usv/system/events", JSON.stringify({
+          event: "reset",
+          timestamp: state.resetTimestamp,
+          ts,
+        }), { qos: 1 });
+        console.log("[DefenseMQTT] ★ 리셋 이벤트 발행");
+      }
+
+      // ── 아군 alive 상태 변경 감지 및 발행 ──
+      const currentAlive = state.allies.map(a => a.alive);
+      const aliveChanged = currentAlive.some((alive, i) =>
+        prevAlliesAlive.current[i] !== undefined && prevAlliesAlive.current[i] !== alive
+      );
+
+      if (aliveChanged || prevAlliesAlive.current.length !== currentAlive.length) {
+        // 무력화된 아군 ID 목록
+        const killedIds = currentAlive
+          .map((alive, i) => (!alive && prevAlliesAlive.current[i] === true) ? i : -1)
+          .filter(id => id >= 0);
+
+        if (killedIds.length > 0) {
+          client.publish("usv/allies/status", JSON.stringify({
+            event: "ally_killed",
+            killedIds,
+            aliveStatus: currentAlive,
+            ts,
+          }), { qos: 1 });
+          console.log(`[DefenseMQTT] ★ 아군 무력화 이벤트: ${killedIds.join(", ")}`);
+        }
+      }
+      prevAlliesAlive.current = [...currentAlive];
 
       // 아군 텔레메트리 (개별)
       state.allies.forEach((ally) => {

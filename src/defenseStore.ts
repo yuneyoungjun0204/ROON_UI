@@ -44,6 +44,7 @@ interface DefenseStore {
   step: number;
   done: boolean;
   bridgeMode: boolean;  // 브릿지 모드 (외부 데이터 수신)
+  resetTimestamp: number;  // 리셋 시점 (MQTT 이벤트용)
 
   // ── 액션 ──
   reset: (formation?: EnemyFormation) => void;
@@ -116,6 +117,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   step: 0,
   done: false,
   bridgeMode: false,
+  resetTimestamp: 0,
 
   // ── 액션 ──
 
@@ -135,6 +137,7 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       formation: f,
       step: 0,
       done: false,
+      resetTimestamp: Date.now(),  // MQTT 이벤트 트리거용
     });
   },
 

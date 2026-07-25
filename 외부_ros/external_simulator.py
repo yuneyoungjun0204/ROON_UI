@@ -263,7 +263,7 @@ def spawn_wave() -> List[Enemy]:
 
 
 def spawn_allies() -> List[Ally]:
-    """아군 스폰: 모선 후미에 횡렬 배치"""
+    """아군 스폰: 모선 후미에 횡렬 배치 (WP 명령 대기)"""
     center = CONFIG["worldSize"] / 2
     row_z = center + CONFIG["allyRowGap"]
     start_x = center - ((CONFIG["nAllies"] - 1) * CONFIG["allySideSpacing"]) / 2
@@ -272,12 +272,7 @@ def spawn_allies() -> List[Ally]:
     for i in range(CONFIG["nAllies"]):
         ally_x = start_x + i * CONFIG["allySideSpacing"]
 
-        # 테스트용 경로
-        route = [
-            {"x": ally_x, "z": center - CONFIG["worldSize"] * 0.2, "paint": True},
-            {"x": ally_x, "z": center - CONFIG["worldSize"] * 0.35, "paint": False},
-        ]
-
+        # 초기 경로 없음 - WP 명령 대기
         allies.append(Ally(
             id=i,
             x=ally_x,
@@ -285,7 +280,7 @@ def spawn_allies() -> List[Ally]:
             heading=0,  # 북쪽
             speed=0,
             netsRemaining=CONFIG["netsPerShip"],
-            route=route,
+            route=[],  # 빈 경로 - 명령 대기
         ))
 
     return allies
