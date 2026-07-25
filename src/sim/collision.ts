@@ -22,6 +22,14 @@ interface OBB {
   heading: number;     // 방위각 (degrees, 0=North, CW+)
 }
 
+/** 타원 (Ellipse) - 모선 충돌 판정용 */
+interface Ellipse {
+  centerX: number;
+  centerZ: number;
+  semiAxisX: number;   // X축 반지름 (너비 방향)
+  semiAxisZ: number;   // Z축 반지름 (길이 방향)
+}
+
 // 충돌 여유 배율 (선박 크기의 몇 배로 충돌 박스를 설정할지)
 // 1.0 = 정확한 선박 크기, 1.5 = 50% 여유
 const COLLISION_MARGIN = 1.3;
@@ -47,7 +55,7 @@ export function shipToOBB(
   };
 }
 
-/** 모선 OBB (원형 → 정사각형 근사) */
+/** 모선 OBB (원형 → 정사각형 근사) - 레거시 */
 export function mothershipToOBB(
   x: number,
   z: number,
@@ -59,6 +67,26 @@ export function mothershipToOBB(
     halfLength: radius * 0.8,  // 원형을 약간 작은 정사각형으로 근사
     halfWidth: radius * 0.8,
     heading: 0,
+  };
+}
+
+/** 모선 타원 생성 (실제 모선 크기 기반) */
+export function mothershipToEllipse(
+  x: number,
+  z: number
+): Ellipse {
+  // Mothership.tsx와 동일한 크기 계산:
+  // mLen = shipLength * shipScale (3)
+  // mWid = shipWidth * shipScale (3) * 0.8
+  const shipScale = 3;
+  const mLen = C.render.shipLength * shipScale;
+  const mWid = C.render.shipWidth * shipScale * 0.8;
+
+  return {
+    centerX: x,
+    centerZ: z,
+    semiAxisX: mWid / 2,   // 너비의 절반
+    semiAxisZ: mLen / 2,   // 길이의 절반
   };
 }
 
@@ -148,7 +176,7 @@ export function checkOBBCollision(obb1: OBB, obb2: OBB): boolean {
 
 /**
  * OBB와 원(Circle) 충돌 감지
- * 모선(원형)과 선박(OBB) 충돌 체크용
+ * 모선(원형)과 선박(OBB) 충돌 체크용 - 레거시
  */
 export function checkOBBCircleCollision(
   obb: OBB,
@@ -175,6 +203,74 @@ export function checkOBBCircleCollision(
   const distSq = (localX - closestX) ** 2 + (localZ - closestZ) ** 2;
 
   return distSq <= circleRadius ** 2;
+}
+
+/**
+ * OBB와 타원(Ellipse) 충돌 감지
+ * 모선(타원)과 선박(OBB) 충돌 체크용
+ *
+ * 알고리즘: OBB의 코너와 중심점이 타원 내부에 있는지 +
+ *          타원의 샘플 포인트가 OBB 내부에 있는지 확인
+ */
+export function checkOBBEllipseCollision(
+  obb: OBB,
+  ellipse: Ellipse
+): boolean {
+  const corners = getOBBCorners(obb);
+
+  // 1. OBB의 코너가 타원 내부에 있는지 확인
+  for (const corner of corners) {
+    if (isPointInEllipse(corner.x, corner.z, ellipse)) {
+      return true;
+    }
+  }
+
+  // 2. OBB 중심이 타원 내부에 있는지 확인
+  if (isPointInEllipse(obb.centerX, obb.centerZ, ellipse)) {
+    return true;
+  }
+
+  // 3. 타원 경계의 샘플 포인트가 OBB 내부에 있는지 확인
+  const numSamples = 16;  // 타원 둘레를 16등분하여 샘플링
+  for (let i = 0; i < numSamples; i++) {
+    const angle = (2 * Math.PI * i) / numSamples;
+    const px = ellipse.centerX + ellipse.semiAxisX * Math.cos(angle);
+    const pz = ellipse.centerZ + ellipse.semiAxisZ * Math.sin(angle);
+
+    if (isPointInOBB(px, pz, obb)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** 점이 타원 내부에 있는지 확인 */
+function isPointInEllipse(px: number, pz: number, ellipse: Ellipse): boolean {
+  const dx = px - ellipse.centerX;
+  const dz = pz - ellipse.centerZ;
+
+  // 타원 방정식: (x/a)^2 + (z/b)^2 <= 1
+  const normalizedDist =
+    (dx * dx) / (ellipse.semiAxisX * ellipse.semiAxisX) +
+    (dz * dz) / (ellipse.semiAxisZ * ellipse.semiAxisZ);
+
+  return normalizedDist <= 1;
+}
+
+/** 점이 OBB 내부에 있는지 확인 */
+function isPointInOBB(px: number, pz: number, obb: OBB): boolean {
+  const cos = Math.cos(degToRad(-obb.heading));
+  const sin = Math.sin(degToRad(-obb.heading));
+
+  // OBB 로컬 좌표로 변환
+  const dx = px - obb.centerX;
+  const dz = pz - obb.centerZ;
+  const localX = dx * cos - dz * sin;
+  const localZ = dx * sin + dz * cos;
+
+  // 로컬 좌표에서 범위 확인
+  return Math.abs(localX) <= obb.halfWidth && Math.abs(localZ) <= obb.halfLength;
 }
 
 /**
@@ -211,12 +307,17 @@ export function checkAllyCollisions(
 const NET_COLLISION_DELAY_SECONDS = 2.0;
 const NET_COLLISION_DELAY_STEPS = NET_COLLISION_DELAY_SECONDS * 60;  // 60Hz
 
+// 자신이 설치한 그물의 양 끝에서 제외할 셀 수
+const NET_END_EXCLUDE_CELLS = 4;
+
 /**
- * 아군-그물 충돌 체크 (설치 후 2초 지연)
+ * 아군-그물 충돌 체크 (설치 후 2초 지연, 자신의 그물 양 끝 4셀 제외)
  * 그물이 설치된 셀에 아군이 진입하면 충돌
  * @param ally 아군 상태
  * @param netGrid 그물 격자 (true = 그물 있음)
  * @param netGridTime 그물 설치 시점 (step)
+ * @param netOwnerGrid 그물 소유자 격자 (ally id)
+ * @param netSequence 아군별 그물 셀 설치 순서
  * @param currentStep 현재 시뮬레이션 스텝
  * @param worldSize 월드 크기
  * @param gridSize 격자 크기
@@ -227,6 +328,8 @@ export function checkAllyNetCollision(
   ally: { id: number; x: number; z: number; heading: number; alive: boolean; painting?: boolean },
   netGrid: boolean[][],
   netGridTime: number[][],
+  netOwnerGrid: number[][],
+  netSequence: Map<number, Array<{ gx: number; gz: number }>>,
   currentStep: number,
   worldSize: number,
   gridSize: number,
@@ -240,12 +343,33 @@ export function checkAllyNetCollision(
   const obb = shipToOBB(ally.x, ally.z, ally.heading);
   const corners = getOBBCorners(obb);
 
-  // 그물 셀이 활성화되었는지 확인 (2초 지연)
-  const isNetActive = (gx: number, gz: number): boolean => {
+  // 자신의 그물 셀 순서 가져오기
+  const mySequence = netSequence.get(ally.id) || [];
+  const mySeqLength = mySequence.length;
+
+  // 자신의 그물 양 끝 셀인지 확인 (처음 4셀 + 마지막 4셀)
+  const isMyEndCell = (gx: number, gz: number): boolean => {
+    if (netOwnerGrid[gz]?.[gx] !== ally.id) return false;  // 내 그물이 아니면 false
+
+    // 내 그물 셀 순서에서 인덱스 찾기
+    const idx = mySequence.findIndex(c => c.gx === gx && c.gz === gz);
+    if (idx === -1) return false;
+
+    // 처음 4셀 또는 마지막 4셀이면 true
+    return idx < NET_END_EXCLUDE_CELLS || idx >= mySeqLength - NET_END_EXCLUDE_CELLS;
+  };
+
+  // 그물 셀이 활성화되었는지 확인 (2초 지연 + 자신의 양 끝 제외)
+  const isNetActiveForAlly = (gx: number, gz: number): boolean => {
     if (!netGrid[gz]?.[gx]) return false;
     const deployedAt = netGridTime[gz]?.[gx] || 0;
     if (deployedAt === 0) return false;
-    return (currentStep - deployedAt) >= NET_COLLISION_DELAY_STEPS;
+    if ((currentStep - deployedAt) < NET_COLLISION_DELAY_STEPS) return false;
+
+    // 자신이 설치한 그물의 양 끝 4셀은 충돌 제외
+    if (isMyEndCell(gx, gz)) return false;
+
+    return true;
   };
 
   // OBB의 모든 코너가 활성 그물 셀에 있는지 확인
@@ -254,7 +378,7 @@ export function checkAllyNetCollision(
     const gz = Math.floor(corner.z / cellSize);
 
     if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
-      if (isNetActive(gx, gz)) {
+      if (isNetActiveForAlly(gx, gz)) {
         return true;  // 활성 그물에 닿음
       }
     }
@@ -264,7 +388,7 @@ export function checkAllyNetCollision(
   const cx = Math.floor(ally.x / cellSize);
   const cz = Math.floor(ally.z / cellSize);
   if (cx >= 0 && cx < gridSize && cz >= 0 && cz < gridSize) {
-    if (isNetActive(cx, cz)) {
+    if (isNetActiveForAlly(cx, cz)) {
       return true;
     }
   }
@@ -273,13 +397,15 @@ export function checkAllyNetCollision(
 }
 
 /**
- * 모든 아군의 그물 충돌 체크 (설치 후 2초 지연)
+ * 모든 아군의 그물 충돌 체크 (설치 후 2초 지연, 자신의 그물 양 끝 4셀 제외)
  * @returns 그물에 닿은 아군 ID 배열
  */
 export function checkAllAllyNetCollisions(
   allies: Array<{ id: number; x: number; z: number; heading: number; alive: boolean; painting?: boolean }>,
   netGrid: boolean[][],
   netGridTime: number[][],
+  netOwnerGrid: number[][],
+  netSequence: Map<number, Array<{ gx: number; gz: number }>>,
   currentStep: number,
   worldSize: number,
   gridSize: number
@@ -287,7 +413,7 @@ export function checkAllAllyNetCollisions(
   const collided: number[] = [];
 
   for (const ally of allies) {
-    if (checkAllyNetCollision(ally, netGrid, netGridTime, currentStep, worldSize, gridSize)) {
+    if (checkAllyNetCollision(ally, netGrid, netGridTime, netOwnerGrid, netSequence, currentStep, worldSize, gridSize)) {
       collided.push(ally.id);
     }
   }
@@ -296,7 +422,8 @@ export function checkAllAllyNetCollisions(
 }
 
 /**
- * 아군-모선 충돌 체크
+ * 아군-모선 충돌 체크 (타원 기반)
+ * 모선의 실제 크기(길이/너비)에 맞춘 타원으로 충돌 판정
  * @returns 모선과 충돌한 아군 ID 배열
  */
 export function checkMothershipCollisions(
@@ -305,12 +432,15 @@ export function checkMothershipCollisions(
 ): number[] {
   const collided: number[] = [];
 
+  // 모선 타원 생성 (실제 선박 크기 기반)
+  const ellipse = mothershipToEllipse(mothership.x, mothership.z);
+
   for (const ally of allies) {
     if (!ally.alive) continue;
 
     const obb = shipToOBB(ally.x, ally.z, ally.heading);
 
-    if (checkOBBCircleCollision(obb, mothership.x, mothership.z, mothership.radius)) {
+    if (checkOBBEllipseCollision(obb, ellipse)) {
       collided.push(ally.id);
     }
   }
@@ -326,5 +456,18 @@ export function getOBBDebugData(obb: OBB): { corners: Vec2[]; center: Vec2 } {
   return {
     corners: getOBBCorners(obb),
     center: { x: obb.centerX, z: obb.centerZ },
+  };
+}
+
+export function getEllipseDebugData(x: number, z: number): {
+  center: Vec2;
+  semiAxisX: number;
+  semiAxisZ: number;
+} {
+  const ellipse = mothershipToEllipse(x, z);
+  return {
+    center: { x: ellipse.centerX, z: ellipse.centerZ },
+    semiAxisX: ellipse.semiAxisX,
+    semiAxisZ: ellipse.semiAxisZ,
   };
 }

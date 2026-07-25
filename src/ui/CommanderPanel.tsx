@@ -27,10 +27,12 @@ export function CommanderPanel() {
     id: c.id,
     centroidX: c.centroidX,
     centroidZ: c.centroidZ,
-    enemyCount: c.enemyIds?.length || 0,
+    enemyCount: c.enemyCount || c.enemyIds?.length || 0,
     threat: c.threat,
-    bearing: (c as { bearing?: number }).bearing || 0,
-    color: (c as { color?: string }).color || CLUSTER_COLORS[c.id % CLUSTER_COLORS.length],
+    bearing: c.bearing || 0,
+    spread: c.spread || 0,
+    netCovered: c.netCovered || false,
+    color: c.color || CLUSTER_COLORS[c.id % CLUSTER_COLORS.length],
   }));
 
   // 명령 제출
@@ -89,11 +91,16 @@ export function CommanderPanel() {
             <div className="no-clusters">클러스터 없음</div>
           ) : (
             clusterInfos.map((c) => (
-              <div key={c.id} className="cluster-item" style={{ borderLeftColor: c.color }}>
+              <div
+                key={c.id}
+                className={`cluster-item ${c.netCovered ? "net-covered" : ""}`}
+                style={{ borderLeftColor: c.color }}
+              >
                 <span className="cluster-id">C{c.id}</span>
                 <span className="cluster-count">×{c.enemyCount}</span>
                 <span className="cluster-bearing">{c.bearing.toFixed(0)}°</span>
                 <span className="cluster-threat">위협: {(c.threat * 100).toFixed(0)}%</span>
+                {c.netCovered && <span className="net-covered-tag">NET</span>}
               </div>
             ))
           )}
@@ -114,7 +121,7 @@ export function CommanderPanel() {
             const cluster = clusterInfos.find(c => c.id === a.clusterId);
             const clusterColor = cluster?.color || CLUSTER_COLORS[a.clusterId % CLUSTER_COLORS.length];
             return (
-              <div key={a.allyId} className={`assignment-item ${a.status}`}>
+              <div key={a.allyId} className={`assignment-item ${a.status} ${a.deploying ? "deploying" : ""}`}>
                 <span className="ally-tag">#{a.allyId}</span>
                 <span className="arrow">→</span>
                 {a.status === "active" ? (
@@ -126,6 +133,10 @@ export function CommanderPanel() {
                   </span>
                 ) : (
                   <span className="status-tag">{a.status === "reserve" ? "RSV" : "STOP"}</span>
+                )}
+                {a.deploying && <span className="deploying-tag">🎨</span>}
+                {a.netsRemaining !== undefined && (
+                  <span className="nets-tag">NET:{a.netsRemaining}</span>
                 )}
               </div>
             );

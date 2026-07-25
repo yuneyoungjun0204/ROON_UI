@@ -121,7 +121,7 @@ export const DEFENSE_CONFIG = {
 
   // ── 그물 ──
   netsPerShip: 3,
-  netWidth: 4,            // cell 단위 (변경 없음)
+  netWidth: 1,            // cell 단위 (매우 얇은 그물)
   netMaxLen: BASE_CONFIG.netMaxLen * SCALE,
   deploySpeedMult: 1.0,
   deployTurnMult: 1.0,

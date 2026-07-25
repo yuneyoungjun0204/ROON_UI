@@ -58,9 +58,9 @@ export function Mothership({ state }: MothershipProps) {
         <meshStandardMaterial color={0x445566} />
       </mesh>
 
-      {/* Breach 반경 표시 (반투명 원) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.05, 0]}>
-        <ringGeometry args={[state.radius * 0.95, state.radius, 64]} />
+      {/* 충돌 영역 표시 (타원 - 모선 크기에 맞춤) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.05, 0]} scale={[mWid / 2, mLen / 2, 1]}>
+        <ringGeometry args={[0.9, 1, 64]} />
         <meshBasicMaterial
           color={0xff0000}
           transparent
@@ -69,9 +69,9 @@ export function Mothership({ state }: MothershipProps) {
         />
       </mesh>
 
-      {/* Breach 반경 내부 (더 연한 표시) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.03, 0]}>
-        <circleGeometry args={[state.radius, 64]} />
+      {/* 충돌 영역 내부 (더 연한 표시) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.03, 0]} scale={[mWid / 2, mLen / 2, 1]}>
+        <circleGeometry args={[1, 64]} />
         <meshBasicMaterial
           color={0xff0000}
           transparent
@@ -80,9 +80,9 @@ export function Mothership({ state }: MothershipProps) {
         />
       </mesh>
 
-      {/* 안전 구역 외곽선 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.06, 0]}>
-        <ringGeometry args={[state.radius, state.radius * 1.02, 64]} />
+      {/* 충돌 영역 외곽선 (타원) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, mHgt * 0.06, 0]} scale={[mWid / 2, mLen / 2, 1]}>
+        <ringGeometry args={[1, 1.05, 64]} />
         <meshBasicMaterial
           color={0xffff00}
           transparent

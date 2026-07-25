@@ -184,6 +184,9 @@ export function useDefenseMqtt(): void {
 
         // 지휘관 상태 수신 (ROS2 브릿지에서)
         if (topic === "usv/commander/state") {
+          // 클러스터 색상 팔레트
+          const CLUSTER_COLORS = ["#FF8A65", "#BA68C8", "#4FC3F7", "#FFD54F", "#81C784", "#F06292"];
+
           store.setCommanderState({
             model: data.model || "oneway_ros2 (RL)",
             status: data.status || "ready",
@@ -196,22 +199,41 @@ export function useDefenseMqtt(): void {
               enemyCount?: number;
               threat: number;
               bearing: number;
+              spread?: number;
+              netCovered?: boolean;
               color?: string;
             }) => ({
               id: c.id,
               centroidX: c.centroidX,
               centroidZ: c.centroidZ,
               enemyIds: c.enemyIds || [],
+              enemyCount: c.enemyCount || c.enemyIds?.length || 0,
               threat: c.threat,
-              spread: 0,
+              spread: c.spread || 0,
               bearing: c.bearing,
-              color: c.color,
+              netCovered: c.netCovered || false,
+              color: c.color || CLUSTER_COLORS[c.id % CLUSTER_COLORS.length],
             })),
-            assignments: data.assignments || [],
+            assignments: (data.assignments || []).map((a: {
+              allyId: number;
+              clusterId: number;
+              status: string;
+              deploying?: boolean;
+              netsRemaining?: number;
+            }) => ({
+              allyId: a.allyId,
+              clusterId: a.clusterId,
+              status: a.status,
+              deploying: a.deploying || false,
+              netsRemaining: a.netsRemaining ?? 3,
+            })),
             rationale: data.rationale || "",
-            lastUpdate: data.lastUpdate || 0,
+            lastUpdate: data.lastUpdate || data.step || 0,
           });
-          console.log(`[DefenseMQTT] Commander state: ${data.clusters?.length || 0} clusters`);
+          console.log(
+            `[DefenseMQTT] ★ Commander state: ${data.clusters?.length || 0} clusters, ` +
+            `rationale="${(data.rationale || '').substring(0, 50)}..."`
+          );
         }
 
       } catch (e) {

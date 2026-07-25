@@ -190,6 +190,22 @@
   font-size: 10px;
 }
 
+/* 그물로 커버된 클러스터 */
+.cluster-item.net-covered {
+  background: rgba(0, 80, 60, 0.5);
+  border-left-color: #00aa55;
+}
+
+.net-covered-tag {
+  padding: 1px 4px;
+  background: #00aa55;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 2px;
+  margin-left: auto;
+}
+
 /* 투입 배분 */
 .assignments-section {
   margin-bottom: 14px;
@@ -232,6 +248,38 @@
 .assignment-item.stopped {
   border: 1px solid rgba(239, 83, 80, 0.4);
   opacity: 0.5;
+}
+
+/* 그물 전개 중인 아군 */
+.assignment-item.deploying {
+  border-color: #00cc66;
+  background: rgba(0, 80, 50, 0.5);
+  animation: deploying-pulse 1.5s infinite;
+}
+
+@keyframes deploying-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(0, 200, 100, 0.3); }
+  50% { box-shadow: 0 0 8px rgba(0, 200, 100, 0.6); }
+}
+
+.deploying-tag {
+  font-size: 12px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.nets-tag {
+  padding: 1px 4px;
+  background: rgba(0, 150, 100, 0.4);
+  color: #88ffaa;
+  font-size: 9px;
+  font-weight: 500;
+  border-radius: 2px;
+  font-family: monospace;
 }
 
 .ally-tag {

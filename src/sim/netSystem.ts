@@ -41,20 +41,41 @@ export function createEmptyNetTimeGrid(): number[][] {
   );
 }
 
+/** 빈 그물 소유자 격자 생성 (어떤 아군이 설치했는지) */
+export function createEmptyNetOwnerGrid(): number[][] {
+  return Array(C.gridSize).fill(null).map(() =>
+    Array(C.gridSize).fill(-1)  // -1 = 소유자 없음
+  );
+}
+
+/** 빈 아군별 그물 셀 순서 맵 생성 */
+export function createEmptyNetSequenceMap(): Map<number, Array<{ gx: number; gz: number }>> {
+  return new Map();
+}
+
 /**
  * 그물 전개 업데이트
  * - ally가 그물 WP 구간을 이동 중이면 경로를 따라 격자를 칠함
  * - netWidth 만큼의 폭으로 띠(band)를 생성
+ * - 소유자와 설치 순서도 추적
  */
 export function updateNetPainting(
   ally: AllyState,
   prevX: number,
   prevZ: number,
   netGrid: boolean[][],
+  netOwnerGrid: number[][],
+  netSequence: Map<number, Array<{ gx: number; gz: number }>>,
   _dt: number
-): { netGrid: boolean[][]; netSegment: NetSegment | null; newPaintDist: number } {
+): {
+  netGrid: boolean[][];
+  netOwnerGrid: number[][];
+  netSequence: Map<number, Array<{ gx: number; gz: number }>>;
+  netSegment: NetSegment | null;
+  newPaintDist: number;
+} {
   if (!ally.painting || !ally.alive) {
-    return { netGrid, netSegment: null, newPaintDist: ally.paintDist };
+    return { netGrid, netOwnerGrid, netSequence, netSegment: null, newPaintDist: ally.paintDist };
   }
 
   const cellSize = C.worldSize / C.gridSize;
@@ -66,7 +87,7 @@ export function updateNetPainting(
 
   // 최소 이동 거리 (셀 크기의 1%)
   const minDist = cellSize * 0.01;
-  if (dist < minDist) return { netGrid, netSegment: null, newPaintDist: ally.paintDist };
+  if (dist < minDist) return { netGrid, netOwnerGrid, netSequence, netSegment: null, newPaintDist: ally.paintDist };
 
   // 수직 방향 (그물 폭 방향)
   const perpX = -dz / dist;
@@ -75,6 +96,14 @@ export function updateNetPainting(
   // 이동 경로를 따라 격자 칠하기
   const steps = Math.ceil(dist / (cellSize * 0.5));
   const newGrid = netGrid.map(row => [...row]);
+  const newOwnerGrid = netOwnerGrid.map(row => [...row]);
+  const newSequence = new Map(netSequence);
+
+  // 이 아군의 그물 셀 순서 가져오기 (없으면 생성)
+  if (!newSequence.has(ally.id)) {
+    newSequence.set(ally.id, []);
+  }
+  const allySequence = [...newSequence.get(ally.id)!];
 
   for (let s = 0; s <= steps; s++) {
     const t = s / steps;
@@ -87,10 +116,17 @@ export function updateNetPainting(
       const wz = cz + perpZ * w * cellSize;
       const [gx, gz] = worldToGrid(wx, wz);
       if (gz >= 0 && gz < C.gridSize && gx >= 0 && gx < C.gridSize) {
-        newGrid[gz][gx] = true;
+        // 새로 칠하는 셀만 추적
+        if (!newGrid[gz][gx]) {
+          newGrid[gz][gx] = true;
+          newOwnerGrid[gz][gx] = ally.id;
+          allySequence.push({ gx, gz });
+        }
       }
     }
   }
+
+  newSequence.set(ally.id, allySequence);
 
   // 전개 거리 누적
   const newPaintDist = ally.paintDist + dist;
@@ -109,7 +145,7 @@ export function updateNetPainting(
     };
   }
 
-  return { netGrid: newGrid, netSegment, newPaintDist };
+  return { netGrid: newGrid, netOwnerGrid: newOwnerGrid, netSequence: newSequence, netSegment, newPaintDist };
 }
 
 /**

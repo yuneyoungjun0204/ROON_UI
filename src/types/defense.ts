@@ -60,8 +60,12 @@ export interface ClusterInfo {
   centroidX: number;
   centroidZ: number;
   enemyIds: number[];
+  enemyCount?: number;  // 적 수 (enemyIds 대신 사용 가능)
   threat: number;       // 위협도 (모선과의 거리 기반)
-  spread: number;       // 분산도
+  spread: number;       // 분산도 (각도)
+  bearing?: number;     // 모선 기준 방위각
+  netCovered?: boolean; // 그물로 커버된 클러스터
+  color?: string;       // 표시 색상
 }
 
 /** 웨이포인트 */
@@ -98,6 +102,8 @@ export interface Assignment {
   allyId: number;
   clusterId: number;  // -1 = 미할당
   status: "active" | "reserve" | "stopped";
+  deploying?: boolean;      // 그물 전개 중
+  netsRemaining?: number;   // 남은 그물 수
 }
 
 /** 지휘관 상태 (MobRobGPT run_commander_ui.py 스타일) */
@@ -105,7 +111,7 @@ export interface CommanderState {
   model: string;
   status: "ready" | "calling" | "error";
   command: string;
-  clusters: (ClusterInfo & { bearing?: number; color?: string })[];
+  clusters: ClusterInfo[];
   assignments: Assignment[];
   rationale: string;
   lastUpdate: number;

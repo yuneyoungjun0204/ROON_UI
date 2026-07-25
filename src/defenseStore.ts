@@ -21,6 +21,8 @@ import { spawnEnemies, spawnAllies } from "./sim/formations";
 import {
   createEmptyNetGrid,
   createEmptyNetTimeGrid,
+  createEmptyNetOwnerGrid,
+  createEmptyNetSequenceMap,
   updateNetPainting,
   checkCapture,
   checkBreach,
@@ -40,6 +42,8 @@ interface DefenseStore {
   nets: NetSegment[];
   netGrid: boolean[][];
   netGridTime: number[][];  // 그물 설치 시점 (step)
+  netOwnerGrid: number[][];  // 그물 소유자 (ally id)
+  netSequence: Map<number, Array<{ gx: number; gz: number }>>;  // 아군별 그물 셀 순서
   clusters: ClusterInfo[];
   stats: SimStats;
   commanderState: CommanderState;
@@ -116,6 +120,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
   nets: [],
   netGrid: createEmptyNetGrid(),
   netGridTime: createEmptyNetTimeGrid(),
+  netOwnerGrid: createEmptyNetOwnerGrid(),
+  netSequence: createEmptyNetSequenceMap(),
   clusters: [],
   stats: { ...initialStats },
   commanderState: { ...initialCommanderState },
@@ -138,6 +144,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       nets: [],
       netGrid: createEmptyNetGrid(),
       netGridTime: createEmptyNetTimeGrid(),
+      netOwnerGrid: createEmptyNetOwnerGrid(),
+      netSequence: createEmptyNetSequenceMap(),
       clusters: [],
       stats: { ...initialStats },
       commanderState: { ...initialCommanderState },
@@ -166,6 +174,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
     let breaches = state.stats.breaches;
     let newNetGrid = state.netGrid;  // 포획 체크 전에 선언
     let newNetGridTime = state.netGridTime;  // 그물 설치 시점 추적
+    let newNetOwnerGrid = state.netOwnerGrid;  // 그물 소유자 추적
+    let newNetSequence = state.netSequence;  // 아군별 그물 셀 순서
 
     const movedEnemies = state.enemies.map((enemy) => {
       if (!enemy.alive) return enemy;
@@ -207,8 +217,14 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
 
       // 그물 전개 업데이트
       if (updated.painting && updated.netsRemaining > 0) {
-        const { netGrid: updatedGrid, netSegment, newPaintDist } = updateNetPainting(
-          updated, prevX, prevZ, newNetGrid, dt
+        const {
+          netGrid: updatedGrid,
+          netOwnerGrid: updatedOwnerGrid,
+          netSequence: updatedSequence,
+          netSegment,
+          newPaintDist
+        } = updateNetPainting(
+          updated, prevX, prevZ, newNetGrid, newNetOwnerGrid, newNetSequence, dt
         );
 
         // 격자가 변경되었는지 확인하고 설치 시점 기록
@@ -233,6 +249,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
         }
 
         newNetGrid = updatedGrid;
+        newNetOwnerGrid = updatedOwnerGrid;
+        newNetSequence = updatedSequence;
 
         if (netSegment) {
           newNets.push(netSegment);
@@ -276,11 +294,13 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       console.log(`[tick] ⚠ 모선 충돌! (OBB) Ally ${allyId}`);
     }
 
-    // 아군-그물 충돌 체크 (설치된 그물에 아군이 진입, 2초 지연)
+    // 아군-그물 충돌 체크 (설치된 그물에 아군이 진입, 2초 지연, 자신의 양 끝 4셀 제외)
     const netCollisions = checkAllAllyNetCollisions(
       newAllies,
       newNetGrid,
       newNetGridTime,
+      newNetOwnerGrid,
+      newNetSequence,
       newStep,
       C.worldSize,
       C.gridSize
@@ -318,6 +338,8 @@ export const useDefenseStore = create<DefenseStore>((set, get) => ({
       allies: finalAllies,
       netGrid: newNetGrid,
       netGridTime: newNetGridTime,
+      netOwnerGrid: newNetOwnerGrid,
+      netSequence: newNetSequence,
       nets: newNets,
       clusters,
       step: newStep,
