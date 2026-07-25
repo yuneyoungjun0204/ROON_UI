@@ -171,7 +171,7 @@ function spawnRandom(rng: () => number): EnemyState[] {
   return enemies;
 }
 
-/** 아군 스폰: 모선 후미에 횡렬 배치 */
+/** 아군 스폰: 모선 후미에 횡렬 배치 (WP 명령 대기) */
 export function spawnAllies(): AllyState[] {
   const center = C.worldSize / 2;
   const allies: AllyState[] = [];
@@ -182,14 +182,6 @@ export function spawnAllies(): AllyState[] {
 
   for (let i = 0; i < C.nAllies; i++) {
     const allyX = startX + i * C.allySideSpacing;
-
-    // 테스트용 초기 경로: 적 방향으로 이동 후 그물 설치
-    const testRoute = [
-      // WP0: 적 방향으로 전진 (paint=true → 여기서 WP1까지 그물 설치)
-      { x: allyX, z: center - C.worldSize * 0.2, paint: true, started: false, active: true },
-      // WP1: 그물 종료 지점
-      { x: allyX, z: center - C.worldSize * 0.35, paint: false, started: false, active: true },
-    ];
 
     allies.push({
       id: i,
@@ -207,7 +199,7 @@ export function spawnAllies(): AllyState[] {
       painting: false,
       paintDist: 0,
       assignedCluster: -1,
-      route: testRoute,         // 테스트용 경로
+      route: [],                // WP 명령 대기 (초기 정지)
     });
   }
 
