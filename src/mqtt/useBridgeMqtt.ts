@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
 import mqtt from "mqtt";
 import { config } from "../config";
 import { useDefenseStore } from "../defenseStore";
-import { DEFENSE_CONFIG as C } from "../config/defense";
+import { DEFENSE_CONFIG as C, GPS_ORIGIN } from "../config/defense";
 
 type MqttClientType = ReturnType<typeof mqtt.connect>;
 
@@ -41,9 +41,9 @@ export function useBridgeMqtt(): void {
     });
     clientRef.current = client;
 
-    // 모선 GPS 기준점 (남해 매물도 - MobRobGPT와 일치)
-    const motherLat = 34.625;
-    const motherLon = 128.52;
+    // 모선 GPS 기준점 (defense.ts에서 로드)
+    const motherLat = GPS_ORIGIN.lat;
+    const motherLon = GPS_ORIGIN.lon;
 
     // 수신된 데이터 버퍼 (일괄 업데이트용)
     const allyBuffer = new Map<number, any>();

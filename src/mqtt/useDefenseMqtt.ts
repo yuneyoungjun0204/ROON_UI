@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 import mqtt from "mqtt";
 import { config } from "../config";
 import { useDefenseStore } from "../defenseStore";
-import { DEFENSE_CONFIG as C } from "../config/defense";
+import { DEFENSE_CONFIG as C, GPS_ORIGIN } from "../config/defense";
 
 type MqttClientType = ReturnType<typeof mqtt.connect>;
 
@@ -60,9 +60,9 @@ export function useDefenseMqtt(): void {
     });
     clientRef.current = client;
 
-    // 모선 GPS 기준점 (남해 매물도 - MobRobGPT와 일치)
-    const motherLat = 34.625;
-    const motherLon = 128.52;
+    // 모선 GPS 기준점 (defense.ts에서 로드)
+    const motherLat = GPS_ORIGIN.lat;
+    const motherLon = GPS_ORIGIN.lon;
 
     client.on("connect", () => {
       console.log("[DefenseMQTT] 연결됨");

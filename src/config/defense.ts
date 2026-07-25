@@ -6,13 +6,34 @@
 // - BASE_CONFIG: 원본 MobRobGPT 스케일 (12.6km 맵)
 // - SCALE: 공간 스케일 팩터 (거리, 크기)
 // - DEFENSE_CONFIG: 실제 사용 값 (BASE * SCALE)
+//
+// URL 파라미터: ?world=33 (기본값 33m)
 // ─────────────────────────────────────────────────────────────────────────
 
+// URL에서 world 크기 읽기
+function getWorldSizeFromUrl(): number {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('world');
+    if (val) {
+      const n = parseFloat(val);
+      if (!isNaN(n) && n > 0) return n;
+    }
+  }
+  return 33;  // 기본값
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 스케일 팩터 (이 값만 변경하면 모든 거리/크기가 일괄 조정됨)
-// MobRobGPT --world 33 옵션과 일치해야 함
+// 스케일 팩터 (URL 파라미터 또는 기본값 33m 사용)
+// MobRobGPT --world 옵션과 일치해야 함
 // ═══════════════════════════════════════════════════════════════════════════
-export const SCALE = 33 / 12600;  // ≈ 0.00262 (worldSize 33m 기준)
+export const WORLD_SIZE = getWorldSizeFromUrl();
+export const SCALE = WORLD_SIZE / 12600;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GPS 원점 (모선 위치) - MobRobGPT config와 일치해야 함
+// ═══════════════════════════════════════════════════════════════════════════
+export const GPS_ORIGIN = { lat: 34.625, lon: 128.52 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 원본 설정 (MobRobGPT 12.6km 맵 기준)
@@ -154,10 +175,7 @@ export const FORMATION_NAMES: Record<string, string> = {
 // 디버그: 현재 스케일 출력
 // ═══════════════════════════════════════════════════════════════════════════
 if (import.meta.env.DEV) {
-  console.log(`[Defense Config] SCALE = ${SCALE.toFixed(6)}`);
+  console.log(`[Defense Config] WORLD_SIZE=${WORLD_SIZE}m, SCALE=${SCALE.toFixed(6)}`);
   console.log(`  worldSize: ${DEFENSE_CONFIG.worldSize.toFixed(2)}m`);
-  console.log(`  spawnRadius: ${DEFENSE_CONFIG.formations.spawnRadius.toFixed(2)}m`);
-  console.log(`  enemySpeed: ${DEFENSE_CONFIG.enemySpeed.toFixed(3)}m/s`);
-  console.log(`  allySpeed: ${DEFENSE_CONFIG.allySpeed.toFixed(3)}m/s`);
-  console.log(`  shipLength: ${DEFENSE_CONFIG.render.shipLength.toFixed(3)}m`);
+  console.log(`  GPS origin: ${GPS_ORIGIN.lat}, ${GPS_ORIGIN.lon}`);
 }
