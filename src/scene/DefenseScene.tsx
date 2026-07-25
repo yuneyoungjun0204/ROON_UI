@@ -305,8 +305,15 @@ function TacticalShip({ state, team, selected }: {
   const offset = C.worldSize / 2;
 
   const isAlly = team === "ally";
-  const primaryColor = isAlly ? 0x2266ff : 0xff2222;
-  const markerColor = isAlly ? 0x00aaff : 0xff4444;
+
+  // 색상: 비활성화 시 어두운 회색/빨간색
+  const primaryColor = !state.alive
+    ? 0x444444  // 비활성화: 어두운 회색
+    : isAlly ? 0x2266ff : 0xff2222;
+  const markerColor = !state.alive
+    ? 0x880000  // 비활성화: 어두운 빨간색
+    : isAlly ? 0x00aaff : 0xff4444;
+  const opacity = state.alive ? 1.0 : 0.5;
 
   // 스케일된 렌더링 값
   const { shipLength, shipWidth, shipHeight, markerHeight, markerSphere } = C.render;
@@ -315,49 +322,59 @@ function TacticalShip({ state, team, selected }: {
     const g = groupRef.current;
     if (!g) return;
 
-    g.visible = state.alive;
-    if (!state.alive) return;
-
+    // 비활성화된 선박도 표시 (위치 업데이트)
     g.position.set(state.x - offset, 0, state.z - offset);
     g.rotation.y = -(state.heading * Math.PI) / 180;
   });
-
-  if (!state.alive) return null;
 
   return (
     <group ref={groupRef}>
       {/* 선체 */}
       <mesh position={[0, shipHeight / 2, 0]} castShadow>
         <boxGeometry args={[shipWidth, shipHeight, shipLength]} />
-        <meshStandardMaterial color={primaryColor} />
+        <meshStandardMaterial color={primaryColor} transparent={!state.alive} opacity={opacity} />
       </mesh>
 
       {/* 선수 */}
       <mesh position={[0, shipHeight / 2, -shipLength * 0.56]} castShadow>
         <coneGeometry args={[shipWidth / 2, shipLength * 0.3, 4]} />
-        <meshStandardMaterial color={primaryColor} />
+        <meshStandardMaterial color={primaryColor} transparent={!state.alive} opacity={opacity} />
       </mesh>
 
       {/* 브릿지 */}
       <mesh position={[0, shipHeight * 1.5, shipLength * 0.12]} castShadow>
         <boxGeometry args={[shipWidth * 0.66, shipHeight * 1.3, shipLength * 0.3]} />
-        <meshStandardMaterial color={0xeeeeee} />
+        <meshStandardMaterial color={state.alive ? 0xeeeeee : 0x666666} transparent={!state.alive} opacity={opacity} />
       </mesh>
 
       {/* 마커 폴 */}
       <mesh position={[0, markerHeight / 2, 0]}>
         <cylinderGeometry args={[markerSphere * 0.15, markerSphere * 0.15, markerHeight, 8]} />
-        <meshBasicMaterial color={markerColor} />
+        <meshBasicMaterial color={markerColor} transparent={!state.alive} opacity={opacity} />
       </mesh>
 
       {/* 상단 구체 */}
       <mesh position={[0, markerHeight + markerSphere * 0.5, 0]}>
         <sphereGeometry args={[markerSphere]} />
-        <meshBasicMaterial color={markerColor} />
+        <meshBasicMaterial color={markerColor} transparent={!state.alive} opacity={opacity} />
       </mesh>
 
-      {/* 선택 링 */}
-      {selected && (
+      {/* 비활성화 X 표시 */}
+      {!state.alive && (
+        <group position={[0, markerHeight + markerSphere * 2, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 4]}>
+            <boxGeometry args={[markerSphere * 0.3, markerSphere * 3, markerSphere * 0.3]} />
+            <meshBasicMaterial color={0xff0000} />
+          </mesh>
+          <mesh rotation={[0, 0, -Math.PI / 4]}>
+            <boxGeometry args={[markerSphere * 0.3, markerSphere * 3, markerSphere * 0.3]} />
+            <meshBasicMaterial color={0xff0000} />
+          </mesh>
+        </group>
+      )}
+
+      {/* 선택 링 (활성화된 경우만) */}
+      {selected && state.alive && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
           <ringGeometry args={[shipLength * 0.7, shipLength * 0.85, 32]} />
           <meshBasicMaterial color={0x00ff00} transparent opacity={0.6} side={THREE.DoubleSide} />

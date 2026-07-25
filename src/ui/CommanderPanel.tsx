@@ -139,8 +139,17 @@ export function CommanderPanel() {
       {/* 판단 근거 */}
       <div className="rationale-section">
         <div className="section-title">판단 근거 (rationale)</div>
-        <div className="rationale-text">{commanderState.rationale}</div>
+        <div className="rationale-text">
+          {commanderState.rationale || "Commander 시작 대기 중..."}
+        </div>
       </div>
+
+      {/* 마지막 업데이트 시간 */}
+      {commanderState.lastUpdate > 0 && (
+        <div className="update-info">
+          Step: {commanderState.lastUpdate}
+        </div>
+      )}
 
     </div>
   );

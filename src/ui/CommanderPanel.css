@@ -1,13 +1,9 @@
-/* 지휘관 판단 패널 스타일 */
-/* MobRobGPT run_commander_ui.py 스타일 */
+/* ============================================================
+   지휘관 판단 패널 스타일
+   MobRobGPT run_commander_ui.py 스타일 - 그리드 레이아웃용
+   ============================================================ */
 
 .commander-panel {
-  position: absolute;
-  top: 20px;
-  right: 220px;  /* 미니맵 왼쪽 */
-  width: 280px;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
   background: rgba(13, 27, 42, 0.95);
   border-radius: 8px;
   padding: 12px;
@@ -15,6 +11,8 @@
   font-family: 'Segoe UI', sans-serif;
   color: #eceff4;
   font-size: 12px;
+  /* max-height 제거 - 스크롤 가능한 사이드바에서 관리 */
+  flex-shrink: 0;
 }
 
 .commander-panel::-webkit-scrollbar {
@@ -56,24 +54,24 @@
   font-weight: 600;
 }
 
-.status {
+.commander-panel .status {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 10px;
 }
 
-.status.ready {
+.commander-panel .status.ready {
   color: #81C784;
   background: rgba(129, 199, 132, 0.15);
 }
 
-.status.calling {
+.commander-panel .status.calling {
   color: #FFB74D;
   background: rgba(255, 183, 77, 0.15);
   animation: pulse 1s infinite;
 }
 
-.status.error {
+.commander-panel .status.error {
   color: #EF5350;
   background: rgba(239, 83, 80, 0.15);
 }
@@ -289,7 +287,7 @@
   overflow: hidden;
 }
 
-.ally-header {
+.commander-panel .ally-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -298,7 +296,7 @@
   background: rgba(0, 20, 40, 0.5);
 }
 
-.ally-name {
+.commander-panel .ally-name {
   font-weight: 600;
   color: #4FC3F7;
   font-size: 11px;
@@ -356,16 +354,44 @@
 
 /* 판단 근거 */
 .rationale-section {
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .rationale-text {
   font-size: 11px;
-  line-height: 1.5;
-  color: #aabbcc;
-  padding: 8px;
-  background: rgba(0, 40, 60, 0.4);
+  line-height: 1.6;
+  color: #ccdde8;
+  padding: 10px;
+  background: rgba(0, 40, 60, 0.5);
   border-radius: 4px;
   white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(100, 200, 255, 0.15);
 }
 
+.rationale-text::-webkit-scrollbar {
+  width: 5px;
+}
+
+.rationale-text::-webkit-scrollbar-thumb {
+  background: rgba(100, 200, 255, 0.4);
+  border-radius: 3px;
+}
+
+/* 데이터 없음 표시 */
+.rationale-text:empty::before {
+  content: "LLM 응답 대기 중...";
+  color: #668899;
+  font-style: italic;
+}
+
+/* 업데이트 정보 */
+.update-info {
+  font-size: 10px;
+  color: #668899;
+  text-align: right;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 200, 255, 0.1);
+}

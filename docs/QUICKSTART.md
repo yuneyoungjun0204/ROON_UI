@@ -26,15 +26,15 @@ npm run dev
 
 ### 터미널 3: ROS2 브릿지
 ```bash
-source /opt/ros/humble/setup.bash
-source /home/yune/ros2_ws/install/setup.bash
+source /opt/ros/humble/setup.zsh
+source /home/yune/ros2_ws/install/setup.zsh
 ros2 run mqtt_ros2_bridge usv_bridge
 ```
 
 ### 터미널 4: RL 추론 (선택)
 ```bash
-source /opt/ros/humble/setup.bash
-source /home/yune/ros2_ws/install/setup.bash
+source /opt/ros/humble/setup.zsh
+source /home/yune/ros2_ws/install/setup.zsh
 ros2 launch oneway_ros2 oneway.launch.py
 ```
 
@@ -78,29 +78,6 @@ python3 scripts/test_mqtt_bridge.py --stop
 | `usv/defense/state` | 시뮬→ROS2 | 전체 상태 |
 | `usv/ally/{id}/route` | ROS2→시뮬 | 웨이포인트 |
 | `usv/system/commands` | ROS2→시뮬 | start/stop/reset |
-| `usv/commander/state` | ROS2→시뮬 | 지휘관 판단 (MobRobGPT 스타일) |
-
----
-
-## 지휘관 판단 패널 (MobRobGPT 스타일)
-
-RL 추론 결과를 MobRobGPT의 `run_commander_ui.py --cell`과 동일하게 표시:
-
-### 표시 항목
-- **모델명/상태**: oneway_ros2 (RL), ready/calling/error
-- **명령 입력**: 프롬프트 전송
-- **적 클러스터 탐지**: 클러스터별 방위각, 적 수, 위협도
-- **투입 배분**: 아군 → 클러스터 할당 (active/reserve/stopped)
-- **판단 근거**: RL 정책의 결정 이유
-
-### 데이터 흐름
-```
-oneway_ros2 (RL 추론)
-    ↓ Path 발행
-usv_bridge (ROS2 노드)
-    ↓ MQTT usv/commander/state
-USV 시뮬레이터 (CommanderPanel)
-```
 
 ---
 

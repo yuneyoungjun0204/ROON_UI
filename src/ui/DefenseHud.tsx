@@ -22,14 +22,28 @@ const COMMANDER_API = "/api/commander";
 /** 버드아이 뷰 미니맵 */
 function BattlefieldMinimap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const allies = useDefenseStore((s) => s.allies);
   const enemies = useDefenseStore((s) => s.enemies);
   const mothership = useDefenseStore((s) => s.mothership);
   const nets = useDefenseStore((s) => s.nets);
+  const [mapSize, setMapSize] = useState(200);
 
-  const MAP_SIZE = 180;
   const WORLD_SIZE = C.worldSize;
-  const scale = MAP_SIZE / WORLD_SIZE;
+  const scale = mapSize / WORLD_SIZE;
+
+  // 컨테이너 크기에 맞게 맵 크기 조정
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth - 20; // 패딩 제외
+        setMapSize(Math.min(width, 280));
+      }
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,20 +55,20 @@ function BattlefieldMinimap() {
     const draw = () => {
       // 배경
       ctx.fillStyle = "#0a3055";
-      ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+      ctx.fillRect(0, 0, mapSize, mapSize);
 
       // 그리드
       ctx.strokeStyle = "rgba(100, 200, 255, 0.1)";
       ctx.lineWidth = 0.5;
       for (let i = 0; i <= 4; i++) {
-        const pos = (i / 4) * MAP_SIZE;
+        const pos = (i / 4) * mapSize;
         ctx.beginPath();
         ctx.moveTo(pos, 0);
-        ctx.lineTo(pos, MAP_SIZE);
+        ctx.lineTo(pos, mapSize);
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(0, pos);
-        ctx.lineTo(MAP_SIZE, pos);
+        ctx.lineTo(mapSize, pos);
         ctx.stroke();
       }
 
@@ -131,15 +145,15 @@ function BattlefieldMinimap() {
 
     const animId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animId);
-  }, [allies, enemies, mothership, nets, scale]);
+  }, [allies, enemies, mothership, nets, scale, mapSize]);
 
   return (
-    <div className="minimap">
+    <div className="minimap" ref={containerRef}>
       <div className="minimap-title">전장 현황</div>
       <canvas
         ref={canvasRef}
-        width={MAP_SIZE}
-        height={MAP_SIZE}
+        width={mapSize}
+        height={mapSize}
         className="minimap-canvas"
       />
       <div className="minimap-legend">
@@ -321,106 +335,123 @@ export function DefenseHud() {
 
   return (
     <div className="defense-hud">
-      {/* 상단: 시나리오 + 시간 */}
-      <div className="hud-top">
-        <div className="scenario-info">
-          <span className="label">시나리오:</span>
-          <span className="value">{FORMATION_NAMES[formation]}</span>
+      {/* ═══════════════════════════════════════════════════════════
+          상단: 시나리오 정보 + 통계
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="hud-top-container">
+        <div className="hud-top">
+          <div className="scenario-info">
+            <span className="label">시나리오:</span>
+            <span className="value">{FORMATION_NAMES[formation]}</span>
+          </div>
+          <div className="time-info">
+            <span className="label">경과:</span>
+            <span className="value">{elapsedSec}s</span>
+            <span className="step">(step {step})</span>
+          </div>
         </div>
-        <div className="time-info">
-          <span className="label">경과:</span>
-          <span className="value">{elapsedSec}s</span>
-          <span className="step">(step {step})</span>
-        </div>
-      </div>
 
-      {/* 전황 통계 */}
-      <div className="stats-panel">
-        <div className="stat good">
-          <span className="stat-label">포획</span>
-          <span className="stat-value">{stats.captures}</span>
-        </div>
-        <div className="stat bad">
-          <span className="stat-label">돌파</span>
-          <span className="stat-value">{stats.breaches}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">적 잔존</span>
-          <span className="stat-value">{aliveEnemies}/10</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">아군</span>
-          <span className="stat-value">{aliveAllies}/3</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">그물 사용</span>
-          <span className="stat-value">{stats.netsUsed}</span>
-        </div>
-      </div>
-
-      {/* 아군 상태 패널 */}
-      <div className="allies-panel">
-        <div className="panel-title">아군 함대</div>
-        {allies.map((ally) => (
-          <AllyStatusCard
-            key={ally.id}
-            ally={ally}
-            selected={ally.id === selectedAlly}
-            onSelect={() => selectAlly(ally.id)}
-            onStartNet={() => startNetDeploy(ally.id)}
-            onStopNet={() => stopNetDeploy(ally.id)}
-          />
-        ))}
-      </div>
-
-      {/* 지휘관 판단 패널 (MobRobGPT 스타일) */}
-      <CommanderPanel />
-
-      {/* 버드아이 뷰 미니맵 */}
-      <BattlefieldMinimap />
-
-      {/* 카메라 도움말 */}
-      <CameraHelp />
-
-      {/* Commander 제어 */}
-      <CommanderControl />
-
-      {/* 시나리오 선택 */}
-      <div className="formation-panel">
-        <div className="panel-title">적 포메이션</div>
-        <div className="formation-buttons">
-          {(["concentrated", "diversionary", "wave", "random"] as EnemyFormation[]).map(
-            (f) => (
-              <button
-                key={f}
-                className={`formation-btn ${formation === f ? "active" : ""}`}
-                onClick={() => {
-                  setFormation(f);
-                  reset(f);
-                }}
-              >
-                {FORMATION_NAMES[f]}
-              </button>
-            )
-          )}
+        <div className="stats-panel">
+          <div className="stat good">
+            <span className="stat-label">포획</span>
+            <span className="stat-value">{stats.captures}</span>
+          </div>
+          <div className="stat bad">
+            <span className="stat-label">돌파</span>
+            <span className="stat-value">{stats.breaches}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">적 잔존</span>
+            <span className="stat-value">{aliveEnemies}/10</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">아군</span>
+            <span className="stat-value">{aliveAllies}/3</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">그물</span>
+            <span className="stat-value">{stats.netsUsed}</span>
+          </div>
         </div>
       </div>
 
-      {/* 제어 버튼 */}
-      <div className="control-panel">
-        <button
-          className={`control-btn ${running ? "pause" : "play"}`}
-          onClick={toggleRunning}
-          disabled={done}
-        >
-          {running ? "⏸ 일시정지" : "▶ 시작"}
-        </button>
-        <button className="control-btn reset" onClick={() => reset()}>
-          🔄 리셋
-        </button>
+      {/* ═══════════════════════════════════════════════════════════
+          왼쪽 사이드바: 아군 함대 + Commander 제어
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="left-sidebar">
+        <div className="allies-panel">
+          <div className="panel-title">아군 함대</div>
+          {allies.map((ally) => (
+            <AllyStatusCard
+              key={ally.id}
+              ally={ally}
+              selected={ally.id === selectedAlly}
+              onSelect={() => selectAlly(ally.id)}
+              onStartNet={() => startNetDeploy(ally.id)}
+              onStopNet={() => stopNetDeploy(ally.id)}
+            />
+          ))}
+        </div>
+
+        <CommanderControl />
       </div>
 
-      {/* 종료 메시지 */}
+      {/* ═══════════════════════════════════════════════════════════
+          오른쪽 사이드바: 지휘관 패널 + 미니맵 + 포메이션 + 카메라 도움말
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="right-sidebar">
+        {/* 지휘관 판단 패널 */}
+        <CommanderPanel />
+
+        {/* 버드아이 뷰 미니맵 */}
+        <BattlefieldMinimap />
+
+        {/* 시나리오 선택 */}
+        <div className="formation-panel">
+          <div className="panel-title">적 포메이션</div>
+          <div className="formation-buttons">
+            {(["concentrated", "diversionary", "wave", "random"] as EnemyFormation[]).map(
+              (f) => (
+                <button
+                  key={f}
+                  className={`formation-btn ${formation === f ? "active" : ""}`}
+                  onClick={() => {
+                    setFormation(f);
+                    reset(f);
+                  }}
+                >
+                  {FORMATION_NAMES[f]}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* 카메라 도움말 */}
+        <CameraHelp />
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          하단: 제어 버튼
+          ═══════════════════════════════════════════════════════════ */}
+      <div className="bottom-container">
+        <div className="control-panel">
+          <button
+            className={`control-btn ${running ? "pause" : "play"}`}
+            onClick={toggleRunning}
+            disabled={done}
+          >
+            {running ? "⏸ 일시정지" : "▶ 시작"}
+          </button>
+          <button className="control-btn reset" onClick={() => reset()}>
+            🔄 리셋
+          </button>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          종료 메시지 (모달)
+          ═══════════════════════════════════════════════════════════ */}
       {done && (
         <div className="game-over">
           <div className="result">
